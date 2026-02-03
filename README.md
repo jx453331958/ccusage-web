@@ -73,24 +73,28 @@ The SQLite database will be stored in `./data/ccusage.db` and persisted across c
 
 ## Agent Setup
 
-To report usage from a device, you need to run the agent script.
+To report usage from a device:
 
 1. Create an API key in the dashboard (API Keys tab)
 
-2. On the device you want to monitor, run:
+2. Run the one-liner setup script:
 ```bash
-cd agent
-node agent.js --server http://your-server:3000 --api-key YOUR_API_KEY
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh && chmod +x setup.sh && ./setup.sh install
 ```
 
-3. Or set environment variables:
+The script will:
+- Prompt for your server URL and API key
+- Detect your OS (macOS/Linux)
+- Install as a background service (launchd/systemd/cron)
+
+Other commands:
 ```bash
-export CCUSAGE_SERVER=http://your-server:3000
-export CCUSAGE_API_KEY=your_api_key
-node agent.js
+./setup.sh status     # Check agent status
+./setup.sh uninstall  # Remove agent
+./setup.sh run        # Run once for testing
 ```
 
-See [agent/README.md](agent/README.md) for more details on running the agent as a background service.
+See [agent/README.md](agent/README.md) for manual setup and more details.
 
 ## API Documentation
 
@@ -217,4 +221,4 @@ MIT License
 
 ## Author
 
-Created with Claude Code
+jx453331958
