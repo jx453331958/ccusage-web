@@ -1,0 +1,90 @@
+{
+  "common": {
+    "appName": "CCUsage Web",
+    "appDescription": "Claude Code Usage Monitor",
+    "welcome": "Welcome",
+    "logout": "Logout",
+    "loading": "Loading...",
+    "backToDashboard": "Back to Dashboard",
+    "settings": "Settings"
+  },
+  "login": {
+    "title": "CCUsage Web",
+    "description": "Sign in to your admin account",
+    "username": "Username",
+    "password": "Password",
+    "usernamePlaceholder": "admin",
+    "passwordPlaceholder": "Enter your password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "loginFailed": "Login failed",
+    "networkError": "Network error"
+  },
+  "dashboard": {
+    "tabs": {
+      "overview": "Overview",
+      "devices": "Devices",
+      "apiKeys": "API Keys"
+    },
+    "timeRange": {
+      "1d": "1 Day",
+      "7d": "7 Days",
+      "30d": "30 Days",
+      "all": "All Time"
+    },
+    "stats": {
+      "totalTokens": "Total Tokens",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "totalRecords": "Total Records",
+      "combinedInputOutput": "Combined input + output",
+      "sentToClaude": "Sent to Claude",
+      "receivedFromClaude": "Received from Claude",
+      "usageReports": "Usage reports"
+    },
+    "apiKeys": {
+      "title": "API Keys",
+      "description": "Manage API keys for agent authentication",
+      "createNew": "Create New Key",
+      "createTitle": "Create API Key",
+      "createDescription": "Create a new API key for a device to report usage data",
+      "deviceName": "Device Name",
+      "deviceNamePlaceholder": "e.g., MacBook Pro, Desktop PC",
+      "creating": "Creating...",
+      "createKey": "Create Key",
+      "done": "Done",
+      "successTitle": "API Key Created Successfully",
+      "successDescription": "Make sure to copy this key now. You won't be able to see it again!",
+      "noKeys": "No API keys yet. Create one to get started.",
+      "created": "Created",
+      "lastUsed": "Last used",
+      "deleteConfirm": "Are you sure you want to delete this API key?"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your account settings",
+    "account": {
+      "title": "Account Information",
+      "description": "Your account details",
+      "username": "Username",
+      "userId": "User ID",
+      "accountCreated": "Account Created"
+    },
+    "password": {
+      "title": "Change Password",
+      "description": "Update your account password",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "minChars": "Minimum 6 characters",
+      "changing": "Changing Password...",
+      "changePassword": "Change Password",
+      "passwordsNotMatch": "New passwords do not match",
+      "passwordTooShort": "Password must be at least 6 characters",
+      "passwordChanged": "Password changed successfully",
+      "passwordChangeFailed": "Failed to change password",
+      "errorOccurred": "An error occurred. Please try again."
+    }
+  }
+}
