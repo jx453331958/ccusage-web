@@ -73,24 +73,28 @@ SQLite 数据库将存储在 `./data/ccusage.db`，容器重启后数据会保�
 
 ## Agent 配置
 
-要从设备上报用量数据，需要运行 agent 脚本。
+要从设备上报用量数据:
 
 1. 在仪表板的 API Keys 标签页创建 API key
 
-2. 在需要监控的设备上运行:
+2. 运行一键安装脚本:
 ```bash
-cd agent
-node agent.js --server http://你的服务器:3000 --api-key 你的API密钥
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh && chmod +x setup.sh && ./setup.sh install
 ```
 
-3. 或使用环境变量:
+脚本会:
+- 提示输入服务器地址和 API key
+- 检测操作系统（macOS/Linux）
+- 自动配置为后台服务（launchd/systemd/cron）
+
+其他命令:
 ```bash
-export CCUSAGE_SERVER=http://你的服务器:3000
-export CCUSAGE_API_KEY=你的api密钥
-node agent.js
+./setup.sh status     # 查看 agent 状态
+./setup.sh uninstall  # 卸载 agent
+./setup.sh run        # 手动运行一次（测试用）
 ```
 
-查看 [agent/README.md](agent/README.md) 了解如何将 agent 作为后台服务运行。
+查看 [agent/README.md](agent/README.md) 了解手动配置和更多详情。
 
 ## API 文档
 
@@ -217,4 +221,4 @@ MIT License
 
 ## 作者
 
-使用 Claude Code 创建
+jx453331958
