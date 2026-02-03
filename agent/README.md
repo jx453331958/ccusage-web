@@ -2,16 +2,38 @@
 
 A lightweight monitoring agent that collects Claude Code usage data and reports it to the CCUsage Web server.
 
-## Installation
+## Quick Setup
 
-The agent is a standalone Node.js script with no dependencies. Simply copy `agent.js` to your device.
+Run the setup script for automatic installation:
 
-## Usage
+```bash
+./setup.sh install
+```
+
+This will:
+1. Prompt for your server URL and API key
+2. Detect your OS (macOS/Linux)
+3. Install as a background service (launchd/systemd/cron)
+
+Other commands:
+```bash
+./setup.sh status     # Check agent status
+./setup.sh uninstall  # Remove agent
+./setup.sh run        # Run once for testing
+```
+
+## Manual Usage
 
 ### Basic Usage
 
 ```bash
 node agent.js --server http://your-server:3000 --api-key YOUR_API_KEY
+```
+
+### One-shot Mode (for cron)
+
+```bash
+node agent.js --server http://your-server:3000 --api-key YOUR_API_KEY --once
 ```
 
 ### Environment Variables

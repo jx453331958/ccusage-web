@@ -29,12 +29,16 @@ const config = {
   stateFile: path.join(os.homedir(), '.ccusage-agent-state.json'),
 };
 
+let runOnce = false;
+
 // Parse command line arguments
 process.argv.slice(2).forEach((arg, i, args) => {
   if (arg === '--server' && args[i + 1]) {
     config.server = args[i + 1];
   } else if (arg === '--api-key' && args[i + 1]) {
     config.apiKey = args[i + 1];
+  } else if (arg === '--once') {
+    runOnce = true;
   } else if (arg === '--help') {
     console.log(`
 CCUsage Agent - Claude Code Usage Monitor
@@ -45,6 +49,7 @@ Usage:
 Options:
   --server URL      Server URL (default: http://localhost:3000)
   --api-key KEY     API key for authentication
+  --once            Run once and exit (for cron scheduling)
   --help            Show this help message
 
 Environment Variables:
@@ -124,6 +129,39 @@ function findJsonlFiles() {
   return files;
 }
 
+// Extract usage from an entry (supports multiple formats)
+function extractUsage(entry) {
+  // Format 1: Direct usage object (type: "usage")
+  if (entry.type === 'usage' && entry.usage) {
+    return entry.usage;
+  }
+  
+  // Format 2: Assistant message with usage (type: "assistant")
+  if (entry.type === 'assistant' && entry.message?.usage) {
+    return entry.message.usage;
+  }
+  
+  // Format 3: Top-level usage field
+  if (entry.usage && (entry.usage.input_tokens || entry.usage.output_tokens)) {
+    return entry.usage;
+  }
+  
+  // Format 4: costUSD with inputTokens/outputTokens (ccusage format)
+  if (entry.inputTokens !== undefined || entry.outputTokens !== undefined) {
+    return {
+      input_tokens: entry.inputTokens || 0,
+      output_tokens: entry.outputTokens || 0,
+    };
+  }
+  
+  // Format 5: Nested in response
+  if (entry.response?.usage) {
+    return entry.response.usage;
+  }
+  
+  return null;
+}
+
 // Parse JSONL file and extract usage records
 function parseJsonlFile(filePath) {
   const records = [];
@@ -135,27 +173,35 @@ function parseJsonlFile(filePath) {
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
+        const usage = extractUsage(entry);
+        
+        if (!usage) continue;
+        
+        const inputTokens = usage.input_tokens || usage.inputTokens || 0;
+        const outputTokens = usage.output_tokens || usage.outputTokens || 0;
+        
+        // Skip empty usage
+        if (inputTokens === 0 && outputTokens === 0) continue;
+        
+        // Create unique record ID
+        const timestamp = entry.timestamp 
+          ? Math.floor(new Date(entry.timestamp).getTime() / 1000) 
+          : Math.floor(Date.now() / 1000);
+        const recordId = `${filePath}:${timestamp}:${inputTokens}:${outputTokens}`;
 
-        // Look for usage data in different formats
-        if (entry.type === 'usage' && entry.usage) {
-          const recordId = `${filePath}:${entry.timestamp}:${entry.usage.input_tokens}`;
-
-          // Skip if already reported
-          if (state.reportedRecords.has(recordId)) {
-            continue;
-          }
-
-          const timestamp = entry.timestamp ? Math.floor(new Date(entry.timestamp).getTime() / 1000) : Math.floor(Date.now() / 1000);
-
-          records.push({
-            input_tokens: entry.usage.input_tokens || 0,
-            output_tokens: entry.usage.output_tokens || 0,
-            total_tokens: (entry.usage.input_tokens || 0) + (entry.usage.output_tokens || 0),
-            session_id: entry.session_id || null,
-            timestamp: timestamp,
-            _recordId: recordId,
-          });
+        // Skip if already reported
+        if (state.reportedRecords.has(recordId)) {
+          continue;
         }
+
+        records.push({
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          total_tokens: inputTokens + outputTokens,
+          session_id: entry.sessionId || entry.session_id || null,
+          timestamp: timestamp,
+          _recordId: recordId,
+        });
       } catch (err) {
         // Skip invalid JSON lines
       }
@@ -213,19 +259,25 @@ async function reportUsage(records) {
 
 // Main monitoring loop
 async function run() {
-  console.log('CCUsage Agent started');
-  console.log(`Server: ${config.server}`);
-  console.log(`Claude projects: ${config.claudeProjectsDir}`);
-  console.log(`Report interval: ${config.reportInterval / 60000} minutes`);
-  console.log('---');
+  if (!runOnce) {
+    console.log('CCUsage Agent started');
+    console.log(`Server: ${config.server}`);
+    console.log(`Claude projects: ${config.claudeProjectsDir}`);
+    console.log(`Report interval: ${config.reportInterval / 60000} minutes`);
+    console.log('---');
+  }
 
   loadState();
 
   async function collect() {
-    console.log(`[${new Date().toLocaleTimeString()}] Collecting usage data...`);
+    if (!runOnce) {
+      console.log(`[${new Date().toLocaleTimeString()}] Collecting usage data...`);
+    }
 
     const files = findJsonlFiles();
-    console.log(`Found ${files.length} JSONL files`);
+    if (!runOnce) {
+      console.log(`Found ${files.length} JSONL files`);
+    }
 
     let allRecords = [];
     for (const file of files) {
@@ -233,13 +285,25 @@ async function run() {
       allRecords = allRecords.concat(records);
     }
 
-    console.log(`Collected ${allRecords.length} new records`);
+    if (!runOnce) {
+      console.log(`Collected ${allRecords.length} new records`);
+    }
+    
     await reportUsage(allRecords);
-    console.log('---');
+    
+    if (!runOnce) {
+      console.log('---');
+    }
   }
 
   // Initial collection
   await collect();
+
+  // If --once, exit after first run
+  if (runOnce) {
+    saveState();
+    process.exit(0);
+  }
 
   // Schedule periodic collection
   setInterval(collect, config.reportInterval);
