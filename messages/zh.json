@@ -67,7 +67,14 @@
       "noData": "所选时间段内没有可用数据",
       "inputTokens": "输入 Token",
       "outputTokens": "输出 Token",
-      "totalTokens": "总 Token"
+      "totalTokens": "总 Token",
+      "chartSettings": "图表设置",
+      "xAxis": {
+        "tickCount": "X 轴标签数量",
+        "labelAngle": "标签角度",
+        "auto": "自动",
+        "all": "全部"
+      }
     },
     "modelBreakdown": {
       "title": "模型分类",

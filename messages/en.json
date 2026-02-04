@@ -67,7 +67,14 @@
       "noData": "No data available for the selected period",
       "inputTokens": "Input Tokens",
       "outputTokens": "Output Tokens",
-      "totalTokens": "Total Tokens"
+      "totalTokens": "Total Tokens",
+      "chartSettings": "Chart Settings",
+      "xAxis": {
+        "tickCount": "X-Axis Labels",
+        "labelAngle": "Label Angle",
+        "auto": "Auto",
+        "all": "All"
+      }
     },
     "modelBreakdown": {
       "title": "Model Breakdown",

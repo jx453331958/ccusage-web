@@ -64,17 +64,34 @@ save_config() {
     cat > "$CONFIG_FILE" << EOF
 CCUSAGE_SERVER="$CCUSAGE_SERVER"
 CCUSAGE_API_KEY="$CCUSAGE_API_KEY"
+REPORT_INTERVAL="$REPORT_INTERVAL"
 EOF
     chmod 600 "$CONFIG_FILE"
+}
+
+# Validate report interval (1-1440 minutes)
+validate_interval() {
+    local interval="$1"
+    if [[ ! "$interval" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+    if [[ "$interval" -lt 1 ]] || [[ "$interval" -gt 1440 ]]; then
+        return 1
+    fi
+    return 0
 }
 
 prompt_config() {
     load_config
 
+    # Set default report interval if not set
+    REPORT_INTERVAL="${REPORT_INTERVAL:-5}"
+
     # Check if we already have config from environment or file
     if [[ -n "$CCUSAGE_SERVER" ]] && [[ -n "$CCUSAGE_API_KEY" ]]; then
         log_info "Using existing configuration"
         log_info "Server: $CCUSAGE_SERVER"
+        log_info "Report interval: ${REPORT_INTERVAL} minutes"
         save_config
         return
     fi
@@ -99,7 +116,7 @@ prompt_config() {
         echo ""
         echo "  Method 1: Set environment variables"
         echo "    curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | \\"
-        echo "      CCUSAGE_SERVER=http://your-server:3000 CCUSAGE_API_KEY=your-key bash -s install"
+        echo "      CCUSAGE_SERVER=http://your-server:3000 CCUSAGE_API_KEY=your-key REPORT_INTERVAL=5 bash -s install"
         echo ""
         echo "  Method 2: Download and run"
         echo "    curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh"
@@ -131,6 +148,16 @@ prompt_config() {
         exit 1
     fi
 
+    printf "Report interval in minutes (1-1440) [%s]: " "$REPORT_INTERVAL"
+    read -r input_interval || true
+    input_interval="${input_interval:-$REPORT_INTERVAL}"
+
+    if ! validate_interval "$input_interval"; then
+        log_error "Report interval must be between 1 and 1440 minutes"
+        exit 1
+    fi
+    REPORT_INTERVAL="$input_interval"
+
     save_config
     log_info "Configuration saved to $CONFIG_FILE"
 }
@@ -139,7 +166,7 @@ prompt_config() {
 install_macos() {
     local plist_path="$HOME/Library/LaunchAgents/com.ccusage.agent.plist"
     local node_path=$(which node)
-    
+
     cat > "$plist_path" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -158,6 +185,8 @@ install_macos() {
         <string>$CCUSAGE_SERVER</string>
         <key>CCUSAGE_API_KEY</key>
         <string>$CCUSAGE_API_KEY</string>
+        <key>REPORT_INTERVAL</key>
+        <string>$REPORT_INTERVAL</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -172,11 +201,12 @@ install_macos() {
 </dict>
 </plist>
 EOF
-    
+
     launchctl unload "$plist_path" 2>/dev/null || true
     launchctl load "$plist_path"
-    
+
     log_info "LaunchAgent installed: $plist_path"
+    log_info "Report interval: ${REPORT_INTERVAL} minutes"
     log_info "Logs: /tmp/ccusage-agent.log"
 }
 
@@ -205,9 +235,9 @@ status_macos() {
 install_linux() {
     local service_path="$HOME/.config/systemd/user/$SERVICE_NAME.service"
     local node_path=$(which node)
-    
+
     mkdir -p "$(dirname "$service_path")"
-    
+
     cat > "$service_path" << EOF
 [Unit]
 Description=CCUsage Agent - Claude Code Usage Monitor
@@ -217,6 +247,7 @@ After=network.target
 Type=simple
 Environment="CCUSAGE_SERVER=$CCUSAGE_SERVER"
 Environment="CCUSAGE_API_KEY=$CCUSAGE_API_KEY"
+Environment="REPORT_INTERVAL=$REPORT_INTERVAL"
 ExecStart=$node_path $AGENT_SCRIPT
 Restart=always
 RestartSec=60
@@ -224,12 +255,13 @@ RestartSec=60
 [Install]
 WantedBy=default.target
 EOF
-    
+
     systemctl --user daemon-reload
     systemctl --user enable "$SERVICE_NAME"
     systemctl --user start "$SERVICE_NAME"
-    
+
     log_info "Systemd service installed: $service_path"
+    log_info "Report interval: ${REPORT_INTERVAL} minutes"
     log_info "Check status: systemctl --user status $SERVICE_NAME"
 }
 
@@ -258,12 +290,31 @@ status_linux() {
 
 # Cron fallback
 install_cron() {
-    local cron_cmd="*/5 * * * * CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" $(which node) $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
-    
+    local cron_schedule
+    local interval="${REPORT_INTERVAL:-5}"
+
+    # Generate cron schedule based on interval
+    if [[ "$interval" -eq 1 ]]; then
+        cron_schedule="* * * * *"
+    elif [[ "$interval" -lt 60 ]]; then
+        cron_schedule="*/$interval * * * *"
+    else
+        # For intervals >= 60 minutes, use hourly cron
+        local hours=$((interval / 60))
+        if [[ "$hours" -eq 1 ]]; then
+            cron_schedule="0 * * * *"
+        else
+            cron_schedule="0 */$hours * * *"
+        fi
+    fi
+
+    local cron_cmd="$cron_schedule CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" $(which node) $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
+
     # Remove existing entry and add new one
     (crontab -l 2>/dev/null | grep -v "ccusage-agent\|$AGENT_SCRIPT"; echo "$cron_cmd") | crontab -
-    
-    log_info "Cron job installed (runs every 5 minutes)"
+
+    log_info "Cron job installed (runs every $interval minutes)"
+    log_info "Cron schedule: $cron_schedule"
     log_info "Logs: /tmp/ccusage-agent.log"
 }
 
@@ -310,7 +361,7 @@ cmd_install() {
     
     echo ""
     log_info "Installation complete!"
-    log_info "The agent will now run in the background and report usage every 5 minutes."
+    log_info "The agent will now run in the background and report usage every ${REPORT_INTERVAL} minute(s)."
 }
 
 cmd_uninstall() {
@@ -335,14 +386,15 @@ cmd_uninstall() {
 
 cmd_status() {
     load_config
-    
+
     echo "=== CCUsage Agent Status ==="
     echo ""
     echo "Configuration:"
     echo "  Server: ${CCUSAGE_SERVER:-<not set>}"
     echo "  API Key: ${CCUSAGE_API_KEY:+<configured>}${CCUSAGE_API_KEY:-<not set>}"
+    echo "  Report Interval: ${REPORT_INTERVAL:-5} minutes"
     echo ""
-    
+
     local os=$(detect_os)
     case "$os" in
         macos)
@@ -352,7 +404,7 @@ cmd_status() {
             status_linux
             ;;
     esac
-    
+
     status_cron
 }
 
@@ -391,6 +443,18 @@ cmd_help() {
     echo "  run        Run once (for testing)"
     echo "  update     Update agent.js to latest version"
     echo "  help       Show this help message"
+    echo ""
+    echo "Environment Variables:"
+    echo "  CCUSAGE_SERVER      Server URL (e.g., http://localhost:3000)"
+    echo "  CCUSAGE_API_KEY     API key for authentication"
+    echo "  REPORT_INTERVAL     Report interval in minutes (1-1440, default: 5)"
+    echo ""
+    echo "Examples:"
+    echo "  # Interactive installation"
+    echo "  ./setup.sh install"
+    echo ""
+    echo "  # Non-interactive installation with 1-minute interval"
+    echo "  CCUSAGE_SERVER=http://server:3000 CCUSAGE_API_KEY=key REPORT_INTERVAL=1 ./setup.sh install"
     echo ""
 }
 

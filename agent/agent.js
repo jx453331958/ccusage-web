@@ -20,14 +20,26 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Parse and validate report interval (1-1440 minutes)
+function parseReportInterval(value, defaultValue = 5) {
+  const interval = parseInt(value, 10);
+  if (isNaN(interval) || interval < 1 || interval > 1440) {
+    return defaultValue;
+  }
+  return interval;
+}
+
 // Configuration
 const config = {
   server: process.env.CCUSAGE_SERVER || 'http://localhost:3000',
   apiKey: process.env.CCUSAGE_API_KEY || '',
   claudeProjectsDir: process.env.CLAUDE_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects'),
-  reportInterval: parseInt(process.env.REPORT_INTERVAL || '5', 10) * 60 * 1000, // Convert to ms
+  reportIntervalMinutes: parseReportInterval(process.env.REPORT_INTERVAL, 5),
   stateFile: path.join(os.homedir(), '.ccusage-agent-state.json'),
 };
+
+// Convert to milliseconds
+config.reportInterval = config.reportIntervalMinutes * 60 * 1000;
 
 let runOnce = false;
 
@@ -37,6 +49,9 @@ process.argv.slice(2).forEach((arg, i, args) => {
     config.server = args[i + 1];
   } else if (arg === '--api-key' && args[i + 1]) {
     config.apiKey = args[i + 1];
+  } else if (arg === '--interval' && args[i + 1]) {
+    config.reportIntervalMinutes = parseReportInterval(args[i + 1], 5);
+    config.reportInterval = config.reportIntervalMinutes * 60 * 1000;
   } else if (arg === '--once') {
     runOnce = true;
   } else if (arg === '--help') {
@@ -49,6 +64,7 @@ Usage:
 Options:
   --server URL      Server URL (default: http://localhost:3000)
   --api-key KEY     API key for authentication
+  --interval MIN    Report interval in minutes, 1-1440 (default: 5)
   --once            Run once and exit (for cron scheduling)
   --help            Show this help message
 
@@ -56,7 +72,14 @@ Environment Variables:
   CCUSAGE_SERVER        Server URL
   CCUSAGE_API_KEY       API key for authentication
   CLAUDE_PROJECTS_DIR   Claude projects directory
-  REPORT_INTERVAL       Report interval in minutes (default: 5)
+  REPORT_INTERVAL       Report interval in minutes, 1-1440 (default: 5)
+
+Examples:
+  # Run with 1-minute interval
+  node agent.js --server http://localhost:3000 --api-key KEY --interval 1
+
+  # Run once (for cron)
+  node agent.js --once
     `);
     process.exit(0);
   }
@@ -291,7 +314,7 @@ async function run() {
     console.log('CCUsage Agent started');
     console.log(`Server: ${config.server}`);
     console.log(`Claude projects: ${config.claudeProjectsDir}`);
-    console.log(`Report interval: ${config.reportInterval / 60000} minutes`);
+    console.log(`Report interval: ${config.reportIntervalMinutes} minute(s)`);
     console.log('---');
   }
 
