@@ -62,9 +62,20 @@ load_config() {
 
 save_config() {
     cat > "$CONFIG_FILE" << EOF
+# CCUsage Agent Configuration
+# Edit this file and run './setup.sh restart' to apply changes
+
+# Server URL (required)
 CCUSAGE_SERVER="$CCUSAGE_SERVER"
+
+# API Key (required)
 CCUSAGE_API_KEY="$CCUSAGE_API_KEY"
+
+# Report interval in minutes (1-1440, default: 5)
 REPORT_INTERVAL="$REPORT_INTERVAL"
+
+# Claude projects directory (optional, default: ~/.claude/projects)
+# CLAUDE_PROJECTS_DIR=""
 EOF
     chmod 600 "$CONFIG_FILE"
 }
@@ -231,6 +242,21 @@ status_macos() {
     fi
 }
 
+restart_macos() {
+    local plist_path="$HOME/Library/LaunchAgents/com.ccusage.agent.plist"
+
+    if [[ -f "$plist_path" ]]; then
+        log_info "Restarting service..."
+        launchctl unload "$plist_path" 2>/dev/null || true
+        sleep 1
+        launchctl load "$plist_path"
+        log_info "Service restarted"
+    else
+        log_error "Service not installed. Run 'install' first."
+        exit 1
+    fi
+}
+
 # Linux systemd setup
 install_linux() {
     local service_path="$HOME/.config/systemd/user/$SERVICE_NAME.service"
@@ -288,6 +314,19 @@ status_linux() {
     fi
 }
 
+restart_linux() {
+    local service_path="$HOME/.config/systemd/user/$SERVICE_NAME.service"
+
+    if [[ -f "$service_path" ]]; then
+        log_info "Restarting service..."
+        systemctl --user restart "$SERVICE_NAME"
+        log_info "Service restarted"
+    else
+        log_error "Service not installed. Run 'install' first."
+        exit 1
+    fi
+}
+
 # Cron fallback
 install_cron() {
     local cron_schedule
@@ -330,6 +369,11 @@ status_cron() {
     else
         log_warn "Cron job not found"
     fi
+}
+
+restart_cron() {
+    log_info "Cron jobs don't need restart - they run on schedule"
+    log_info "Next execution will use the updated agent"
 }
 
 # Main commands
@@ -425,10 +469,54 @@ cmd_run() {
     CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" node "$AGENT_SCRIPT" --once
 }
 
+cmd_restart() {
+    local os=$(detect_os)
+
+    case "$os" in
+        macos)
+            restart_macos
+            ;;
+        linux)
+            if systemctl --user status >/dev/null 2>&1; then
+                restart_linux
+            else
+                restart_cron
+            fi
+            ;;
+        *)
+            restart_cron
+            ;;
+    esac
+}
+
 cmd_update() {
     log_info "Updating agent..."
     download_agent
-    log_info "Update complete. Restart the service to apply changes."
+    log_info "Update complete."
+
+    # Check if service is running and restart it
+    local os=$(detect_os)
+    local should_restart=false
+
+    case "$os" in
+        macos)
+            if launchctl list 2>/dev/null | grep -q "com.ccusage.agent"; then
+                should_restart=true
+            fi
+            ;;
+        linux)
+            if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+                should_restart=true
+            fi
+            ;;
+    esac
+
+    if [[ "$should_restart" == "true" ]]; then
+        log_info "Restarting service to apply changes..."
+        cmd_restart
+    else
+        log_info "Service not running, no restart needed."
+    fi
 }
 
 cmd_help() {
@@ -441,8 +529,13 @@ cmd_help() {
     echo "  uninstall  Remove background service and configuration"
     echo "  status     Show current status"
     echo "  run        Run once (for testing)"
-    echo "  update     Update agent.js to latest version"
+    echo "  update     Update agent.js to latest version and restart"
+    echo "  restart    Restart the background service"
+    echo "  config     Edit configuration file"
     echo "  help       Show this help message"
+    echo ""
+    echo "Configuration File:"
+    echo "  $CONFIG_FILE"
     echo ""
     echo "Environment Variables:"
     echo "  CCUSAGE_SERVER      Server URL (e.g., http://localhost:3000)"
@@ -456,6 +549,62 @@ cmd_help() {
     echo "  # Non-interactive installation with 1-minute interval"
     echo "  CCUSAGE_SERVER=http://server:3000 CCUSAGE_API_KEY=key REPORT_INTERVAL=1 ./setup.sh install"
     echo ""
+    echo "  # Update and restart"
+    echo "  ./setup.sh update"
+    echo ""
+    echo "  # Edit configuration"
+    echo "  ./setup.sh config"
+    echo ""
+}
+
+cmd_config() {
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        log_warn "Configuration file not found, creating one..."
+        cat > "$CONFIG_FILE" << 'EOF'
+# CCUsage Agent Configuration
+# Edit this file and run './setup.sh restart' to apply changes
+
+# Server URL (required)
+CCUSAGE_SERVER=""
+
+# API Key (required)
+CCUSAGE_API_KEY=""
+
+# Report interval in minutes (1-1440, default: 5)
+REPORT_INTERVAL="5"
+
+# Claude projects directory (optional, default: ~/.claude/projects)
+# CLAUDE_PROJECTS_DIR=""
+EOF
+        chmod 600 "$CONFIG_FILE"
+    fi
+
+    # Determine editor
+    local editor="${EDITOR:-${VISUAL:-nano}}"
+    if ! command -v "$editor" &> /dev/null; then
+        if command -v vim &> /dev/null; then
+            editor="vim"
+        elif command -v vi &> /dev/null; then
+            editor="vi"
+        else
+            log_error "No editor found. Please set EDITOR environment variable."
+            log_info "You can manually edit: $CONFIG_FILE"
+            exit 1
+        fi
+    fi
+
+    log_info "Opening configuration file with $editor..."
+    log_info "After editing, run './setup.sh restart' to apply changes."
+    echo ""
+    "$editor" "$CONFIG_FILE"
+
+    # Validate config after editing
+    load_config
+    if [[ -z "$CCUSAGE_SERVER" ]] || [[ -z "$CCUSAGE_API_KEY" ]]; then
+        log_warn "Configuration incomplete. Server and API key are required."
+    else
+        log_info "Configuration saved."
+    fi
 }
 
 # Main entry point
@@ -465,6 +614,8 @@ case "${1:-help}" in
     status)    cmd_status ;;
     run)       cmd_run ;;
     update)    cmd_update ;;
+    restart)   cmd_restart ;;
+    config)    cmd_config ;;
     help|--help|-h) cmd_help ;;
     *)
         log_error "Unknown command: $1"

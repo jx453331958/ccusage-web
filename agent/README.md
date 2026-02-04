@@ -21,7 +21,9 @@ Other commands:
 ./setup.sh status     # Check agent status
 ./setup.sh uninstall  # Remove agent
 ./setup.sh run        # Run once for testing
-./setup.sh update     # Update agent to latest version
+./setup.sh update     # Update agent to latest version and restart
+./setup.sh restart    # Restart the background service
+./setup.sh config     # Edit configuration file
 ```
 
 ### Non-interactive Installation
@@ -196,6 +198,43 @@ The report interval controls how often the agent collects and reports usage data
 - **Default**: 5 minutes
 
 For high-frequency monitoring, set `REPORT_INTERVAL=1` to report every minute.
+
+## Configuration File
+
+The agent reads configuration from `~/.ccusage-agent.conf`. You can edit this file to change settings without modifying environment variables or service files.
+
+```bash
+# Edit configuration
+./setup.sh config
+
+# Or manually edit
+nano ~/.ccusage-agent.conf
+```
+
+Example configuration:
+```bash
+# CCUsage Agent Configuration
+# Edit this file and run './setup.sh restart' to apply changes
+
+# Server URL (required)
+CCUSAGE_SERVER="http://your-server:3000"
+
+# API Key (required)
+CCUSAGE_API_KEY="your_api_key"
+
+# Report interval in minutes (1-1440, default: 5)
+REPORT_INTERVAL="5"
+
+# Claude projects directory (optional, default: ~/.claude/projects)
+# CLAUDE_PROJECTS_DIR=""
+```
+
+Configuration priority: command line args > environment variables > config file > defaults
+
+After editing the config file, restart the service to apply changes:
+```bash
+./setup.sh restart
+```
 
 ## State File
 

@@ -20,6 +20,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Configuration file path
+const CONFIG_FILE = path.join(os.homedir(), '.ccusage-agent.conf');
+
 // Parse and validate report interval (1-1440 minutes)
 function parseReportInterval(value, defaultValue = 5) {
   const interval = parseInt(value, 10);
@@ -29,13 +32,48 @@ function parseReportInterval(value, defaultValue = 5) {
   return interval;
 }
 
-// Configuration
+// Load configuration from file (shell format: KEY="value")
+function loadConfigFile() {
+  const fileConfig = {};
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const content = fs.readFileSync(CONFIG_FILE, 'utf8');
+      const lines = content.split('\n');
+      for (const line of lines) {
+        // Skip comments and empty lines
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+
+        // Parse KEY="value" or KEY=value format
+        const match = trimmed.match(/^([A-Z_]+)=["']?(.*)["']?$/);
+        if (match) {
+          const key = match[1];
+          let value = match[2];
+          // Remove trailing quotes if present
+          value = value.replace(/["']$/, '');
+          if (value) {
+            fileConfig[key] = value;
+          }
+        }
+      }
+    }
+  } catch (error) {
+    // Ignore config file errors
+  }
+  return fileConfig;
+}
+
+// Load config from file first, then override with env vars
+const fileConfig = loadConfigFile();
+
+// Configuration (priority: env vars > config file > defaults)
 const config = {
-  server: process.env.CCUSAGE_SERVER || 'http://localhost:3000',
-  apiKey: process.env.CCUSAGE_API_KEY || '',
-  claudeProjectsDir: process.env.CLAUDE_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects'),
-  reportIntervalMinutes: parseReportInterval(process.env.REPORT_INTERVAL, 5),
+  server: process.env.CCUSAGE_SERVER || fileConfig.CCUSAGE_SERVER || 'http://localhost:3000',
+  apiKey: process.env.CCUSAGE_API_KEY || fileConfig.CCUSAGE_API_KEY || '',
+  claudeProjectsDir: process.env.CLAUDE_PROJECTS_DIR || fileConfig.CLAUDE_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects'),
+  reportIntervalMinutes: parseReportInterval(process.env.REPORT_INTERVAL || fileConfig.REPORT_INTERVAL, 5),
   stateFile: path.join(os.homedir(), '.ccusage-agent-state.json'),
+  configFile: CONFIG_FILE,
 };
 
 // Convert to milliseconds
@@ -67,6 +105,12 @@ Options:
   --interval MIN    Report interval in minutes, 1-1440 (default: 5)
   --once            Run once and exit (for cron scheduling)
   --help            Show this help message
+
+Configuration File:
+  ${CONFIG_FILE}
+
+  The agent reads configuration from this file if it exists.
+  Priority: command line args > environment variables > config file > defaults
 
 Environment Variables:
   CCUSAGE_SERVER        Server URL
@@ -315,6 +359,9 @@ async function run() {
     console.log(`Server: ${config.server}`);
     console.log(`Claude projects: ${config.claudeProjectsDir}`);
     console.log(`Report interval: ${config.reportIntervalMinutes} minute(s)`);
+    if (fs.existsSync(config.configFile)) {
+      console.log(`Config file: ${config.configFile}`);
+    }
     console.log('---');
   }
 
