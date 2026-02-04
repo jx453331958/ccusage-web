@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { LogOut, Activity, Settings, CalendarIcon, BarChart3, Cpu, Key } from 'lucide-react';
+import { LogOut, Activity, Settings, CalendarIcon, BarChart3, Cpu, Key, Monitor, ChevronDown } from 'lucide-react';
 import StatsOverview from './StatsOverview';
 import DeviceList from './DeviceList';
 import ApiKeyManager from './ApiKeyManager';
@@ -35,6 +35,20 @@ export default function DashboardClient({ user }: { user: User }) {
   const [interval, setInterval] = useState<Interval>('auto');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
+  const deviceDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (deviceDropdownRef.current && !deviceDropdownRef.current.contains(event.target as Node)) {
+        setDeviceDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchStats = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -53,6 +67,11 @@ export default function DashboardClient({ user }: { user: User }) {
         url += `&from=${from}&to=${to}`;
       }
 
+      // Add device filter if selected
+      if (selectedDevice) {
+        url += `&device=${encodeURIComponent(selectedDevice)}`;
+      }
+
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -63,7 +82,7 @@ export default function DashboardClient({ user }: { user: User }) {
     } finally {
       setLoading(false);
     }
-  }, [rangeType, customDateRange, interval]);
+  }, [rangeType, customDateRange, interval, selectedDevice]);
 
   useEffect(() => {
     fetchStats();
@@ -148,57 +167,113 @@ export default function DashboardClient({ user }: { user: User }) {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Time Range Selector */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant={rangeType === 'today' ? 'default' : 'outline'}
-                onClick={() => setRangeType('today')}
-              >
-                {t('dashboard.timeRange.today')}
-              </Button>
-              <Button
-                size="sm"
-                variant={rangeType === '7d' ? 'default' : 'outline'}
-                onClick={() => setRangeType('7d')}
-              >
-                {t('dashboard.timeRange.7d')}
-              </Button>
-              <Button
-                size="sm"
-                variant={rangeType === '30d' ? 'default' : 'outline'}
-                onClick={() => setRangeType('30d')}
-              >
-                {t('dashboard.timeRange.30d')}
-              </Button>
+            {/* Filters Row */}
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Device Selector */}
+              <div className="relative" ref={deviceDropdownRef}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
+                  className="min-w-[160px] justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4" />
+                    <span className="truncate max-w-[100px]">
+                      {selectedDevice || t('dashboard.devices.allDevices')}
+                    </span>
+                  </span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
+                </Button>
+                {deviceDropdownOpen && stats?.availableDevices && (
+                  <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-white border rounded-md shadow-lg py-1">
+                    <button
+                      onClick={() => {
+                        setSelectedDevice(null);
+                        setDeviceDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2",
+                        !selectedDevice && "bg-gray-50 font-medium"
+                      )}
+                    >
+                      <Monitor className="h-4 w-4" />
+                      {t('dashboard.devices.allDevices')}
+                    </button>
+                    {stats.availableDevices.map((device: string) => (
+                      <button
+                        key={device}
+                        onClick={() => {
+                          setSelectedDevice(device);
+                          setDeviceDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 truncate",
+                          selectedDevice === device && "bg-gray-50 font-medium"
+                        )}
+                      >
+                        {device}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={rangeType === 'custom' ? 'default' : 'outline'}
-                    className="min-w-[140px]"
-                  >
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    {rangeType === 'custom' && customDateRange ? (
-                      <span className="text-xs">
-                        {format(customDateRange.from, 'MM/dd')} - {format(customDateRange.to, 'MM/dd')}
-                      </span>
-                    ) : (
-                      t('dashboard.timeRange.custom')
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="range"
-                    selected={customDateRange ? { from: customDateRange.from, to: customDateRange.to } : undefined}
-                    onSelect={handleDateRangeSelect}
-                    numberOfMonths={2}
-                    disabled={{ after: new Date() }}
-                  />
-                </PopoverContent>
-              </Popover>
+              {/* Divider */}
+              <div className="h-6 w-px bg-gray-200" />
+
+              {/* Time Range Selector */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant={rangeType === 'today' ? 'default' : 'outline'}
+                  onClick={() => setRangeType('today')}
+                >
+                  {t('dashboard.timeRange.today')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={rangeType === '7d' ? 'default' : 'outline'}
+                  onClick={() => setRangeType('7d')}
+                >
+                  {t('dashboard.timeRange.7d')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={rangeType === '30d' ? 'default' : 'outline'}
+                  onClick={() => setRangeType('30d')}
+                >
+                  {t('dashboard.timeRange.30d')}
+                </Button>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant={rangeType === 'custom' ? 'default' : 'outline'}
+                      className="min-w-[140px]"
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {rangeType === 'custom' && customDateRange ? (
+                        <span className="text-xs">
+                          {format(customDateRange.from, 'MM/dd')} - {format(customDateRange.to, 'MM/dd')}
+                        </span>
+                      ) : (
+                        t('dashboard.timeRange.custom')
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={customDateRange ? { from: customDateRange.from, to: customDateRange.to } : undefined}
+                      onSelect={handleDateRangeSelect}
+                      numberOfMonths={2}
+                      disabled={{ after: new Date() }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
             {loading ? (

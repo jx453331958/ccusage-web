@@ -17,11 +17,11 @@ function getIntervalMinutes(interval: Interval): number {
   }
 }
 
-function buildTrendQuery(interval: Interval): string {
+function buildTrendQuery(interval: Interval, hasDevice: boolean): string {
   const minutes = getIntervalMinutes(interval);
   const intervalSeconds = minutes * 60;
+  const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
 
-  // Return the floored timestamp for frontend to format in user's timezone
   return `
     SELECT
       (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
@@ -29,17 +29,17 @@ function buildTrendQuery(interval: Interval): string {
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens
     FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ?
+    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
     GROUP BY (timestamp / ${intervalSeconds})
     ORDER BY timestamp ASC
   `;
 }
 
-function buildModelTrendQuery(interval: Interval): string {
+function buildModelTrendQuery(interval: Interval, hasDevice: boolean): string {
   const minutes = getIntervalMinutes(interval);
   const intervalSeconds = minutes * 60;
+  const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
 
-  // Return trend data grouped by model
   return `
     SELECT
       (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
@@ -48,7 +48,7 @@ function buildModelTrendQuery(interval: Interval): string {
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens
     FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ?
+    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
     GROUP BY (timestamp / ${intervalSeconds}), model
     ORDER BY timestamp ASC, model ASC
   `;
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
   const interval = (searchParams.get('interval') || 'auto') as Interval | 'auto';
   const fromParam = searchParams.get('from');
   const toParam = searchParams.get('to');
+  const deviceParam = searchParams.get('device'); // Optional device filter
 
   // Calculate timestamp range
   const now = Math.floor(Date.now() / 1000);
@@ -110,7 +111,21 @@ export async function GET(request: NextRequest) {
   const granularity = effectiveInterval === '1d' ? 'daily' : 'minute';
 
   const db = getDb();
-  // Get total stats
+  const hasDevice = !!deviceParam;
+  const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
+
+  // Get list of all available devices (unfiltered by device selection)
+  const availableDevices = db.prepare(`
+    SELECT DISTINCT device_name
+    FROM usage_records
+    WHERE timestamp >= ? AND timestamp <= ?
+    ORDER BY device_name ASC
+  `).all(startTime, endTime) as { device_name: string }[];
+
+  // Base query params
+  const baseParams = hasDevice ? [startTime, endTime, deviceParam] : [startTime, endTime];
+
+  // Get total stats (filtered by device if specified)
   const totalStats = db.prepare(`
     SELECT
       SUM(input_tokens) as total_input,
@@ -118,10 +133,10 @@ export async function GET(request: NextRequest) {
       SUM(total_tokens) as total_tokens,
       COUNT(*) as total_records
     FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ?
-  `).get(startTime, endTime) as { total_input: number; total_output: number; total_tokens: number; total_records: number };
+    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
+  `).get(...baseParams) as { total_input: number; total_output: number; total_tokens: number; total_records: number };
 
-  // Get per-device stats
+  // Get per-device stats (always show all devices for the selector)
   const deviceStats = db.prepare(`
     SELECT
       device_name,
@@ -136,13 +151,13 @@ export async function GET(request: NextRequest) {
     ORDER BY total_tokens DESC
   `).all(startTime, endTime);
 
-  // Get trend data with selected interval
-  const trendQuery = buildTrendQuery(effectiveInterval);
-  const trendData = db.prepare(trendQuery).all(startTime, endTime);
+  // Get trend data with selected interval (filtered by device if specified)
+  const trendQuery = buildTrendQuery(effectiveInterval, hasDevice);
+  const trendData = db.prepare(trendQuery).all(...baseParams);
 
-  // Get model trend data (for per-model charts)
-  const modelTrendQuery = buildModelTrendQuery(effectiveInterval);
-  const modelTrendRaw = db.prepare(modelTrendQuery).all(startTime, endTime) as {
+  // Get model trend data (for per-model charts, filtered by device if specified)
+  const modelTrendQuery = buildModelTrendQuery(effectiveInterval, hasDevice);
+  const modelTrendRaw = db.prepare(modelTrendQuery).all(...baseParams) as {
     timestamp: number;
     model: string;
     input_tokens: number;
@@ -150,7 +165,7 @@ export async function GET(request: NextRequest) {
     total_tokens: number;
   }[];
 
-  // Get per-model stats
+  // Get per-model stats (filtered by device if specified)
   const modelStats = db.prepare(`
     SELECT
       model,
@@ -159,10 +174,10 @@ export async function GET(request: NextRequest) {
       SUM(total_tokens) as total_tokens,
       COUNT(*) as record_count
     FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ?
+    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
     GROUP BY model
     ORDER BY total_tokens DESC
-  `).all(startTime, endTime) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
+  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
 
   return NextResponse.json({
     totalStats: {
@@ -172,6 +187,7 @@ export async function GET(request: NextRequest) {
       totalRecords: totalStats.total_records || 0,
     },
     deviceStats,
+    availableDevices: availableDevices.map(d => d.device_name),
     trendData,
     modelTrendData: modelTrendRaw,
     modelStats,

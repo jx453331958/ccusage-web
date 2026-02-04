@@ -101,7 +101,8 @@
       "noDevices": "还没有设备上报数据",
       "lastReport": "最后上报",
       "in": "输入",
-      "out": "输出"
+      "out": "输出",
+      "allDevices": "所有设备"
     }
   },
   "settings": {

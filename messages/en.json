@@ -101,7 +101,8 @@
       "noDevices": "No devices have reported yet",
       "lastReport": "Last report",
       "in": "in",
-      "out": "out"
+      "out": "out",
+      "allDevices": "All Devices"
     }
   },
   "settings": {
