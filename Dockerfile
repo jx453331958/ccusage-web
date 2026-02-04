@@ -29,6 +29,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install su-exec for dropping privileges
+RUN apk add --no-cache su-exec
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
@@ -40,11 +43,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Create data directory for database
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
-USER nextjs
+# Copy entrypoint script
+COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 
 EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
