@@ -35,6 +35,25 @@ function buildTrendQuery(interval: Interval): string {
   `;
 }
 
+function buildModelTrendQuery(interval: Interval): string {
+  const minutes = getIntervalMinutes(interval);
+  const intervalSeconds = minutes * 60;
+
+  // Return trend data grouped by model
+  return `
+    SELECT
+      (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
+      model,
+      SUM(input_tokens) as input_tokens,
+      SUM(output_tokens) as output_tokens,
+      SUM(total_tokens) as total_tokens
+    FROM usage_records
+    WHERE timestamp >= ?
+    GROUP BY (timestamp / ${intervalSeconds}), model
+    ORDER BY timestamp ASC, model ASC
+  `;
+}
+
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
@@ -98,6 +117,16 @@ export async function GET(request: NextRequest) {
   const trendQuery = buildTrendQuery(effectiveInterval);
   const trendData = db.prepare(trendQuery).all(startTime);
 
+  // Get model trend data (for per-model charts)
+  const modelTrendQuery = buildModelTrendQuery(effectiveInterval);
+  const modelTrendRaw = db.prepare(modelTrendQuery).all(startTime) as {
+    timestamp: number;
+    model: string;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  }[];
+
   // Get per-model stats
   const modelStats = db.prepare(`
     SELECT
@@ -121,6 +150,7 @@ export async function GET(request: NextRequest) {
     },
     deviceStats,
     trendData,
+    modelTrendData: modelTrendRaw,
     modelStats,
     granularity,
     interval: effectiveInterval,

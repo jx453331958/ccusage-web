@@ -73,6 +73,10 @@
       "totalTokens": "Total Tokens",
       "intervalLabel": "Data Interval",
       "currentInterval": "Current",
+      "viewTotal": "Total",
+      "viewByModel": "By Model",
+      "unknownModel": "Unknown",
+      "zoomHint": "Drag the slider below to zoom, or scroll in the chart area",
       "interval": {
         "auto": "Auto",
         "1m": "1 min",

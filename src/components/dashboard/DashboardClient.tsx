@@ -147,6 +147,7 @@ export default function DashboardClient({ user }: { user: User }) {
                 <StatsOverview stats={stats.totalStats} />
                 <UsageTrend
                   trendData={stats.trendData}
+                  modelTrendData={stats.modelTrendData || []}
                   interval={interval}
                   effectiveInterval={stats.interval}
                   onIntervalChange={setInterval}

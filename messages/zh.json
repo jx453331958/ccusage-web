@@ -73,6 +73,10 @@
       "totalTokens": "总 Token",
       "intervalLabel": "数据间隔",
       "currentInterval": "当前",
+      "viewTotal": "总量",
+      "viewByModel": "按模型",
+      "unknownModel": "未知",
+      "zoomHint": "拖动下方滑块缩放，或在图表区域滚动",
       "interval": {
         "auto": "自动",
         "1m": "1 分钟",
