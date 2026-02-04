@@ -53,22 +53,46 @@ export default function DashboardClient({ user }: { user: User }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Build URL for API call
+  // Build URL for API call - always pass from/to timestamps to ensure correct timezone handling
   const buildStatsUrl = useCallback((intervalOverride?: Interval) => {
     const effectiveInterval = intervalOverride ?? interval;
     let url = `/api/usage/stats?interval=${effectiveInterval}`;
 
+    const now = new Date();
+    let from: number;
+    let to: number = Math.floor(now.getTime() / 1000);
+
     if (rangeType === 'today') {
-      url += '&range=today';
+      // Today: from local midnight to now
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      from = Math.floor(today.getTime() / 1000);
     } else if (rangeType === '7d') {
-      url += '&range=7d';
+      // Last 7 days: from 7 days ago at local midnight
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      from = Math.floor(startDate.getTime() / 1000);
     } else if (rangeType === '30d') {
-      url += '&range=30d';
+      // Last 30 days: from 30 days ago at local midnight
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 29);
+      startDate.setHours(0, 0, 0, 0);
+      from = Math.floor(startDate.getTime() / 1000);
     } else if (rangeType === 'custom' && customDateRange) {
-      const from = Math.floor(customDateRange.from.getTime() / 1000);
-      const to = Math.floor(customDateRange.to.getTime() / 1000) + 86400 - 1;
-      url += `&from=${from}&to=${to}`;
+      from = Math.floor(customDateRange.from.getTime() / 1000);
+      // End of the selected day
+      const endDate = new Date(customDateRange.to);
+      endDate.setHours(23, 59, 59, 999);
+      to = Math.floor(endDate.getTime() / 1000);
+    } else {
+      // Default to today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      from = Math.floor(today.getTime() / 1000);
     }
+
+    url += `&from=${from}&to=${to}`;
 
     if (selectedDevice) {
       url += `&device=${encodeURIComponent(selectedDevice)}`;
