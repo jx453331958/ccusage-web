@@ -4,10 +4,12 @@ set -e
 # CCUsage Agent Setup Script
 # Automatically configures the agent as a background service
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENT_SCRIPT="$SCRIPT_DIR/agent.js"
+# Installation directory
+INSTALL_DIR="$HOME/.ccusage-agent"
+AGENT_SCRIPT="$INSTALL_DIR/agent.js"
 CONFIG_FILE="$HOME/.ccusage-agent.conf"
 SERVICE_NAME="ccusage-agent"
+AGENT_URL="https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/agent.js"
 
 # Colors
 RED='\033[0;31m'
@@ -25,6 +27,23 @@ detect_os() {
         Linux*)  echo "linux" ;;
         *)       echo "unknown" ;;
     esac
+}
+
+download_agent() {
+    mkdir -p "$INSTALL_DIR"
+
+    log_info "Downloading agent.js..."
+    if command -v curl &> /dev/null; then
+        curl -sL "$AGENT_URL" -o "$AGENT_SCRIPT"
+    elif command -v wget &> /dev/null; then
+        wget -q "$AGENT_URL" -O "$AGENT_SCRIPT"
+    else
+        log_error "curl or wget is required"
+        exit 1
+    fi
+
+    chmod +x "$AGENT_SCRIPT"
+    log_info "Agent installed to $AGENT_SCRIPT"
 }
 
 check_node() {
@@ -225,8 +244,9 @@ status_cron() {
 # Main commands
 cmd_install() {
     check_node
+    download_agent
     prompt_config
-    
+
     local os=$(detect_os)
     log_info "Detected OS: $os"
     
@@ -268,7 +288,8 @@ cmd_uninstall() {
     uninstall_cron
     rm -f "$CONFIG_FILE"
     rm -f "$HOME/.ccusage-agent-state.json"
-    
+    rm -rf "$INSTALL_DIR"
+
     log_info "Uninstall complete"
 }
 
@@ -296,14 +317,26 @@ cmd_status() {
 }
 
 cmd_run() {
+    check_node
+
+    if [[ ! -f "$AGENT_SCRIPT" ]]; then
+        download_agent
+    fi
+
     load_config
-    
+
     if [[ -z "$CCUSAGE_SERVER" ]] || [[ -z "$CCUSAGE_API_KEY" ]]; then
         prompt_config
     fi
-    
+
     log_info "Running agent once..."
     CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" node "$AGENT_SCRIPT" --once
+}
+
+cmd_update() {
+    log_info "Updating agent..."
+    download_agent
+    log_info "Update complete. Restart the service to apply changes."
 }
 
 cmd_help() {
@@ -316,6 +349,7 @@ cmd_help() {
     echo "  uninstall  Remove background service and configuration"
     echo "  status     Show current status"
     echo "  run        Run once (for testing)"
+    echo "  update     Update agent.js to latest version"
     echo "  help       Show this help message"
     echo ""
 }
@@ -326,6 +360,7 @@ case "${1:-help}" in
     uninstall) cmd_uninstall ;;
     status)    cmd_status ;;
     run)       cmd_run ;;
+    update)    cmd_update ;;
     help|--help|-h) cmd_help ;;
     *)
         log_error "Unknown command: $1"
