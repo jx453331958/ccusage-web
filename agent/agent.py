@@ -254,7 +254,8 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
         print('No new records to report')
         return True
 
-    url = f"{config['server']}/api/usage/report"
+    server = config['server'].rstrip('/')
+    url = f"{server}/api/usage/report"
 
     payload = {
         'records': [
