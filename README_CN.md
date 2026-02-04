@@ -347,7 +347,20 @@ ccusage-web/
 
 ## 截图
 
-_截图将添加在这里_
+### 仪表盘概览
+![仪表盘](screenshots/dashboard.png)
+
+### 按模型分类的使用趋势
+![模型趋势](screenshots/model-trend.png)
+
+### 多设备支持
+![设备列表](screenshots/devices.png)
+
+### API 密钥管理
+![API 密钥](screenshots/api-keys.png)
+
+### 一键安装代理
+![一键安装](screenshots/one-click-install.png)
 
 ## 贡献
 

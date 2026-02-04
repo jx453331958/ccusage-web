@@ -337,7 +337,20 @@ ccusage-web/
 
 ## Screenshots
 
-_Screenshots will be added here_
+### Dashboard Overview
+![Dashboard](screenshots/dashboard.png)
+
+### Usage Trend by Model
+![Model Trend](screenshots/model-trend.png)
+
+### Multi-Device Support
+![Devices](screenshots/devices.png)
+
+### API Key Management
+![API Keys](screenshots/api-keys.png)
+
+### One-Click Agent Installation
+![One-Click Install](screenshots/one-click-install.png)
 
 ## Contributing
 
