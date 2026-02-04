@@ -29,7 +29,50 @@ A web-based monitoring dashboard for Claude Code token usage across multiple dev
 
 ## Quick Start
 
-### Development
+### For End Users (Agent Only)
+
+If you just want to monitor your Claude Code usage, you don't need to clone the repository. Just use the one-liner:
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
+```
+
+This will:
+- Download and configure the monitoring agent
+- Prompt for your server URL and API key (get from your admin)
+- Install as a background service automatically
+
+**That's it!** No git, no clone, no hassle.
+
+---
+
+### For Server Deployment
+
+#### Option 1: Docker (Recommended)
+
+**No git clone needed!** Just create a directory and download the docker-compose file:
+
+```bash
+mkdir ccusage-web && cd ccusage-web
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/docker-compose.yml -o docker-compose.yml
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/.env.example -o .env
+```
+
+Edit `.env` with your credentials:
+```bash
+nano .env  # or vim/any editor
+```
+
+Start the server:
+```bash
+docker-compose up -d
+```
+
+Access at http://localhost:3000
+
+#### Option 2: Development Setup
+
+For development or custom deployment:
 
 1. Clone the repository:
 ```bash
@@ -42,7 +85,7 @@ cd ccusage-web
 npm install
 ```
 
-3. Create environment file:
+3. Configure environment:
 ```bash
 cp .env.example .env
 # Edit .env and set your credentials
@@ -59,45 +102,47 @@ npm run dev
 
 6. The dashboard supports English and Chinese - use the language switcher in the top right corner
 
-### Docker Deployment
-
-1. Create `.env` file with your configuration:
-```bash
-JWT_SECRET=your-secret-key-change-this
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your-secure-password
-```
-
-2. Build and run with Docker Compose:
-```bash
-docker-compose up -d
-```
-
-3. Access the dashboard at http://localhost:3000
-
 The SQLite database will be stored in `./data/ccusage.db` and persisted across container restarts.
 
 ## Agent Setup
 
-To report usage from a device:
+### One-Line Installation (Recommended)
 
-1. Create an API key in the dashboard (API Keys tab)
+Get your API key from the dashboard (API Keys tab), then run:
 
-2. Run the one-liner setup script:
 ```bash
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh && chmod +x setup.sh && ./setup.sh install
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
 ```
 
-The script will:
-- Prompt for your server URL and API key
+The script will prompt for your server URL and API key, then automatically:
 - Detect your OS (macOS/Linux)
-- Install as a background service (launchd/systemd/cron)
+- Install Node.js monitoring agent
+- Configure as a background service (launchd/systemd/cron)
+- Start reporting usage every 5 minutes
 
-Other commands:
+### Managing the Agent
+
+Check status:
 ```bash
-./setup.sh status     # Check agent status
-./setup.sh uninstall  # Remove agent
-./setup.sh run        # Run once for testing
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s status
+```
+
+Uninstall:
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s uninstall
+```
+
+### Alternative: Download Once
+
+If you prefer to download the script first:
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
+chmod +x setup.sh
+./setup.sh install    # Install
+./setup.sh status     # Check status
+./setup.sh uninstall  # Remove
+./setup.sh run        # Test run
 ```
 
 See [agent/README.md](agent/README.md) for manual setup and more details.

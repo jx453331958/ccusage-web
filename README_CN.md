@@ -29,7 +29,50 @@
 
 ## 快速开始
 
-### 开发模式
+### 普通用户（仅安装监控 Agent）
+
+如果你只想监控 Claude Code 使用情况，无需克隆仓库。直接运行一键安装命令：
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
+```
+
+脚本会自动：
+- 下载并配置监控 agent
+- 提示输入服务器地址和 API 密钥（从管理员获取）
+- 自动安装为后台服务
+
+**就这么简单！** 无需 git、无需 clone、零麻烦。
+
+---
+
+### 服务器部署
+
+#### 方式 1: Docker 部署（推荐）
+
+**无需 git clone！** 只需创建目录并下载配置文件：
+
+```bash
+mkdir ccusage-web && cd ccusage-web
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/docker-compose.yml -o docker-compose.yml
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/.env.example -o .env
+```
+
+编辑 `.env` 设置你的凭据：
+```bash
+nano .env  # 或使用 vim/其他编辑器
+```
+
+启动服务器：
+```bash
+docker-compose up -d
+```
+
+访问 http://localhost:3000
+
+#### 方式 2: 开发部署
+
+适用于开发或自定义部署：
 
 1. 克隆仓库:
 ```bash
@@ -42,7 +85,7 @@ cd ccusage-web
 npm install
 ```
 
-3. 创建环境变量文件:
+3. 配置环境变量:
 ```bash
 cp .env.example .env
 # 编辑 .env 设置你的凭据
@@ -59,45 +102,47 @@ npm run dev
 
 6. 仪表板支持中英文切换 - 点击右上角的语言切换按钮
 
-### Docker 部署
-
-1. 创建 `.env` 文件并配置:
-```bash
-JWT_SECRET=你的密钥-请修改
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=你的安全密码
-```
-
-2. 使用 Docker Compose 构建并运行:
-```bash
-docker-compose up -d
-```
-
-3. 访问仪表板: http://localhost:3000
-
 SQLite 数据库将存储在 `./data/ccusage.db`，容器重启后数据会保留。
 
 ## Agent 配置
 
-要从设备上报用量数据:
+### 一键安装（推荐）
 
-1. 在仪表板的 API Keys 标签页创建 API key
+在仪表板的 API Keys 标签页获取 API 密钥，然后运行：
 
-2. 运行一键安装脚本:
 ```bash
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh && chmod +x setup.sh && ./setup.sh install
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
 ```
 
-脚本会:
-- 提示输入服务器地址和 API key
+脚本会提示输入服务器地址和 API 密钥，然后自动：
 - 检测操作系统（macOS/Linux）
-- 自动配置为后台服务（launchd/systemd/cron）
+- 安装 Node.js 监控 agent
+- 配置为后台服务（launchd/systemd/cron）
+- 开始每 5 分钟上报一次使用数据
 
-其他命令:
+### 管理 Agent
+
+查看状态：
 ```bash
-./setup.sh status     # 查看 agent 状态
-./setup.sh uninstall  # 卸载 agent
-./setup.sh run        # 手动运行一次（测试用）
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s status
+```
+
+卸载：
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s uninstall
+```
+
+### 备选方式：先下载脚本
+
+如果你想先下载脚本再执行：
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
+chmod +x setup.sh
+./setup.sh install    # 安装
+./setup.sh status     # 查看状态
+./setup.sh uninstall  # 卸载
+./setup.sh run        # 测试运行
 ```
 
 查看 [agent/README.md](agent/README.md) 了解手动配置和更多详情。
