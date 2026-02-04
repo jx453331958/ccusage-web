@@ -20,6 +20,9 @@ export async function GET(request: NextRequest) {
   else if (range === '30d') startTime = now - 30 * 24 * 60 * 60;
   else if (range === 'all') startTime = 0;
 
+  // Determine granularity: hourly for 1d, daily for others
+  const granularity = range === '1d' ? 'hourly' : 'daily';
+
   const db = getDb();
   // Get total stats
   const totalStats = db.prepare(`
@@ -47,18 +50,45 @@ export async function GET(request: NextRequest) {
     ORDER BY total_tokens DESC
   `).all(startTime);
 
-  // Get daily trend data
-  const trendData = db.prepare(`
+  // Get trend data - hourly for 1d, daily for others
+  const trendQuery = granularity === 'hourly'
+    ? `
+      SELECT
+        strftime('%Y-%m-%d %H:00', timestamp, 'unixepoch') as date,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(total_tokens) as total_tokens
+      FROM usage_records
+      WHERE timestamp >= ?
+      GROUP BY date
+      ORDER BY date ASC
+    `
+    : `
+      SELECT
+        DATE(timestamp, 'unixepoch') as date,
+        SUM(input_tokens) as input_tokens,
+        SUM(output_tokens) as output_tokens,
+        SUM(total_tokens) as total_tokens
+      FROM usage_records
+      WHERE timestamp >= ?
+      GROUP BY date
+      ORDER BY date ASC
+    `;
+  const trendData = db.prepare(trendQuery).all(startTime);
+
+  // Get per-model stats
+  const modelStats = db.prepare(`
     SELECT
-      DATE(timestamp, 'unixepoch') as date,
+      model,
       SUM(input_tokens) as input_tokens,
       SUM(output_tokens) as output_tokens,
-      SUM(total_tokens) as total_tokens
+      SUM(total_tokens) as total_tokens,
+      COUNT(*) as record_count
     FROM usage_records
     WHERE timestamp >= ?
-    GROUP BY date
-    ORDER BY date ASC
-  `).all(startTime);
+    GROUP BY model
+    ORDER BY total_tokens DESC
+  `).all(startTime) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
 
   return NextResponse.json({
     totalStats: {
@@ -69,5 +99,7 @@ export async function GET(request: NextRequest) {
     },
     deviceStats,
     trendData,
+    modelStats,
+    granularity,
   });
 }

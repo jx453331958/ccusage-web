@@ -63,10 +63,19 @@
     "usageTrend": {
       "title": "Usage Trend",
       "description": "Daily token usage over time",
+      "descriptionHourly": "Hourly token usage over time",
       "noData": "No data available for the selected period",
       "inputTokens": "Input Tokens",
       "outputTokens": "Output Tokens",
       "totalTokens": "Total Tokens"
+    },
+    "modelBreakdown": {
+      "title": "Model Breakdown",
+      "description": "Token usage by model",
+      "noData": "No model data available",
+      "unknownModel": "Unknown Model",
+      "in": "In",
+      "out": "Out"
     },
     "devices": {
       "title": "Devices",

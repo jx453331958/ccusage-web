@@ -129,37 +129,63 @@ function findJsonlFiles() {
   return files;
 }
 
+// Extract model from an entry (supports multiple formats)
+function extractModel(entry) {
+  // Format 1: Assistant message with model
+  if (entry.message?.model) {
+    return entry.message.model;
+  }
+
+  // Format 2: Direct model field
+  if (entry.model) {
+    return entry.model;
+  }
+
+  // Format 3: Nested in response
+  if (entry.response?.model) {
+    return entry.response.model;
+  }
+
+  return null;
+}
+
 // Extract usage from an entry (supports multiple formats)
 function extractUsage(entry) {
+  let usage = null;
+
   // Format 1: Direct usage object (type: "usage")
   if (entry.type === 'usage' && entry.usage) {
-    return entry.usage;
+    usage = entry.usage;
   }
-  
   // Format 2: Assistant message with usage (type: "assistant")
-  if (entry.type === 'assistant' && entry.message?.usage) {
-    return entry.message.usage;
+  else if (entry.type === 'assistant' && entry.message?.usage) {
+    usage = entry.message.usage;
   }
-  
   // Format 3: Top-level usage field
-  if (entry.usage && (entry.usage.input_tokens || entry.usage.output_tokens)) {
-    return entry.usage;
+  else if (entry.usage && (entry.usage.input_tokens || entry.usage.output_tokens)) {
+    usage = entry.usage;
   }
-  
   // Format 4: costUSD with inputTokens/outputTokens (ccusage format)
-  if (entry.inputTokens !== undefined || entry.outputTokens !== undefined) {
-    return {
+  else if (entry.inputTokens !== undefined || entry.outputTokens !== undefined) {
+    usage = {
       input_tokens: entry.inputTokens || 0,
       output_tokens: entry.outputTokens || 0,
     };
   }
-  
   // Format 5: Nested in response
-  if (entry.response?.usage) {
-    return entry.response.usage;
+  else if (entry.response?.usage) {
+    usage = entry.response.usage;
   }
-  
-  return null;
+
+  if (!usage) return null;
+
+  // Attach model to usage object
+  const model = extractModel(entry);
+  if (model) {
+    usage.model = model;
+  }
+
+  return usage;
 }
 
 // Parse JSONL file and extract usage records
@@ -199,6 +225,7 @@ function parseJsonlFile(filePath) {
           output_tokens: outputTokens,
           total_tokens: inputTokens + outputTokens,
           session_id: entry.sessionId || entry.session_id || null,
+          model: usage.model || null,
           timestamp: timestamp,
           _recordId: recordId,
         });
@@ -233,6 +260,7 @@ async function reportUsage(records) {
           output_tokens: r.output_tokens,
           total_tokens: r.total_tokens,
           session_id: r.session_id,
+          model: r.model,
           timestamp: r.timestamp,
         })),
       }),

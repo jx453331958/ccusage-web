@@ -14,16 +14,34 @@ interface TrendData {
 
 interface UsageTrendProps {
   trendData: TrendData[];
+  granularity?: 'hourly' | 'daily';
 }
 
-export default function UsageTrend({ trendData }: UsageTrendProps) {
+// Format date for X-axis based on granularity
+function formatXAxis(date: string, granularity: 'hourly' | 'daily'): string {
+  if (granularity === 'hourly') {
+    // date is "YYYY-MM-DD HH:00", extract time part
+    const timePart = date.split(' ')[1];
+    return timePart || date;
+  }
+  // date is "YYYY-MM-DD", extract month-day
+  const parts = date.split('-');
+  if (parts.length === 3) {
+    return `${parts[1]}-${parts[2]}`;
+  }
+  return date;
+}
+
+export default function UsageTrend({ trendData, granularity = 'daily' }: UsageTrendProps) {
   const t = useTranslations('dashboard.usageTrend');
+
+  const description = granularity === 'hourly' ? t('descriptionHourly') : t('description');
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('title')}</CardTitle>
-        <CardDescription>{t('description')}</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         {trendData.length === 0 ? (
@@ -39,6 +57,7 @@ export default function UsageTrend({ trendData }: UsageTrendProps) {
                   dataKey="date"
                   tick={{ fontSize: 12 }}
                   interval="preserveStartEnd"
+                  tickFormatter={(value) => formatXAxis(value, granularity)}
                 />
                 <YAxis
                   tickFormatter={(value) => formatNumber(value)}

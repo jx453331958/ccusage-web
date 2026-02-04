@@ -11,6 +11,7 @@ import StatsOverview from './StatsOverview';
 import DeviceList from './DeviceList';
 import ApiKeyManager from './ApiKeyManager';
 import UsageTrend from './UsageTrend';
+import ModelBreakdown from './ModelBreakdown';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 interface User {
@@ -141,7 +142,8 @@ export default function DashboardClient({ user }: { user: User }) {
             ) : stats ? (
               <>
                 <StatsOverview stats={stats.totalStats} />
-                <UsageTrend trendData={stats.trendData} />
+                <UsageTrend trendData={stats.trendData} granularity={stats.granularity} />
+                <ModelBreakdown modelStats={stats.modelStats || []} />
               </>
             ) : null}
           </TabsContent>

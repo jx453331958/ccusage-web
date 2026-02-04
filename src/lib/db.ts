@@ -67,11 +67,19 @@ function initializeDatabase() {
     )
   `);
 
+  // Migration: Add model column if it doesn't exist
+  const columns = database.prepare("PRAGMA table_info(usage_records)").all() as { name: string }[];
+  const hasModelColumn = columns.some((col) => col.name === 'model');
+  if (!hasModelColumn) {
+    database.exec(`ALTER TABLE usage_records ADD COLUMN model TEXT DEFAULT 'unknown'`);
+  }
+
   // Create indices for better query performance
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_records(timestamp);
     CREATE INDEX IF NOT EXISTS idx_usage_device ON usage_records(device_name);
     CREATE INDEX IF NOT EXISTS idx_usage_api_key ON usage_records(api_key_id);
+    CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model);
   `);
 
   // Create default admin user if no users exist
@@ -113,6 +121,7 @@ export interface UsageRecord {
   output_tokens: number;
   total_tokens: number;
   session_id: string | null;
+  model: string;
   timestamp: number;
   created_at: number;
 }
