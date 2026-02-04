@@ -33,7 +33,7 @@
 
 1. 克隆仓库:
 ```bash
-git clone https://github.com/yourusername/ccusage-web.git
+git clone git@github.com:jx453331958/ccusage-web.git
 cd ccusage-web
 ```
 

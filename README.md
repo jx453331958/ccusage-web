@@ -33,7 +33,7 @@ A web-based monitoring dashboard for Claude Code token usage across multiple dev
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/ccusage-web.git
+git clone git@github.com:jx453331958/ccusage-web.git
 cd ccusage-web
 ```
 
