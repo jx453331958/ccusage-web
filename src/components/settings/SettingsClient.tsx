@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,7 @@ interface SettingsClientProps {
 export default function SettingsClient({ user }: SettingsClientProps) {
   const router = useRouter();
   const t = useTranslations();
+  const locale = useLocale();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -72,41 +73,47 @@ export default function SettingsClient({ user }: SettingsClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto p-6 max-w-4xl">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white">Settings</h1>
-            <p className="text-slate-400 mt-1">Manage your account settings</p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => router.push('/dashboard')}>
-              Back to Dashboard
-            </Button>
-            <Button variant="outline" onClick={handleLogout}>
-              Logout
-            </Button>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('settings.title')}</h1>
+              <p className="text-xs sm:text-sm text-gray-500">{t('settings.description')}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <LanguageSwitcher currentLocale={locale} />
+              <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="flex-shrink-0">
+                {t('common.backToDashboard')}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="flex-shrink-0">
+                {t('common.logout')}
+              </Button>
+            </div>
           </div>
         </div>
+      </header>
 
-        <div className="grid gap-6">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
+
           <Card>
             <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-              <CardDescription>Your account details</CardDescription>
+              <CardTitle>{t('settings.account.title')}</CardTitle>
+              <CardDescription>{t('settings.account.description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div>
-                  <Label className="text-sm text-slate-500">Username</Label>
+                  <Label className="text-sm text-slate-500">{t('settings.account.username')}</Label>
                   <p className="text-lg font-medium">{user.username}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-slate-500">User ID</Label>
+                  <Label className="text-sm text-slate-500">{t('settings.account.userId')}</Label>
                   <p className="text-lg font-medium">{user.id}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-slate-500">Account Created</Label>
+                  <Label className="text-sm text-slate-500">{t('settings.account.accountCreated')}</Label>
                   <p className="text-lg font-medium">
                     {new Date(user.created_at * 1000).toLocaleDateString()}
                   </p>
@@ -117,13 +124,13 @@ export default function SettingsClient({ user }: SettingsClientProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-              <CardDescription>Update your account password</CardDescription>
+              <CardTitle>{t('settings.password.title')}</CardTitle>
+              <CardDescription>{t('settings.password.description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
+                  <Label htmlFor="current-password">{t('settings.password.currentPassword')}</Label>
                   <Input
                     id="current-password"
                     type="password"
@@ -135,7 +142,7 @@ export default function SettingsClient({ user }: SettingsClientProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
+                  <Label htmlFor="new-password">{t('settings.password.newPassword')}</Label>
                   <Input
                     id="new-password"
                     type="password"
@@ -145,11 +152,11 @@ export default function SettingsClient({ user }: SettingsClientProps) {
                     disabled={isLoading}
                     minLength={6}
                   />
-                  <p className="text-sm text-slate-500">Minimum 6 characters</p>
+                  <p className="text-sm text-slate-500">{t('settings.password.minChars')}</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Label htmlFor="confirm-password">{t('settings.password.confirmPassword')}</Label>
                   <Input
                     id="confirm-password"
                     type="password"
@@ -174,13 +181,13 @@ export default function SettingsClient({ user }: SettingsClientProps) {
                 )}
 
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? 'Changing Password...' : 'Change Password'}
+                  {isLoading ? t('settings.password.changing') : t('settings.password.changePassword')}
                 </Button>
               </form>
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

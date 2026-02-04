@@ -59,6 +59,22 @@
       "created": "Created",
       "lastUsed": "Last used",
       "deleteConfirm": "Are you sure you want to delete this API key?"
+    },
+    "usageTrend": {
+      "title": "Usage Trend",
+      "description": "Daily token usage over time",
+      "noData": "No data available for the selected period",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "totalTokens": "Total Tokens"
+    },
+    "devices": {
+      "title": "Devices",
+      "description": "Token usage per device",
+      "noDevices": "No devices have reported yet",
+      "lastReport": "Last report",
+      "in": "in",
+      "out": "out"
     }
   },
   "settings": {

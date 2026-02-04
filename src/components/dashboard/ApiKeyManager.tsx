@@ -85,14 +85,14 @@ export default function ApiKeyManager() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <CardTitle>{t('title')}</CardTitle>
             <CardDescription>{t('description')}</CardDescription>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Key className="h-4 w-4 mr-2" />
                 {t('createNew')}
               </Button>
@@ -177,24 +177,26 @@ export default function ApiKeyManager() {
             apiKeys.map((apiKey) => (
               <div
                 key={apiKey.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-gray-50 gap-3"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="p-2 bg-purple-100 rounded-lg">
+                  <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
                     <Key className="h-4 w-4 text-purple-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium">{apiKey.device_name}</div>
+                    <div className="font-medium truncate">{apiKey.device_name}</div>
                     <div className="text-sm text-muted-foreground truncate">
                       {apiKey.key.substring(0, 20)}...
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-1 break-words">
                       {t('created')}: {formatDate(apiKey.created_at)}
-                      {apiKey.last_used_at && ` • ${t('lastUsed')}: ${formatDate(apiKey.last_used_at)}`}
+                      {apiKey.last_used_at && (
+                        <span className="block sm:inline"> • {t('lastUsed')}: {formatDate(apiKey.last_used_at)}</span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
                   <Button
                     size="sm"
                     variant="outline"

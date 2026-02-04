@@ -59,6 +59,22 @@
       "created": "创建时间",
       "lastUsed": "最后使用",
       "deleteConfirm": "你确定要删除此 API 密钥吗？"
+    },
+    "usageTrend": {
+      "title": "使用趋势",
+      "description": "每日 Token 使用量",
+      "noData": "所选时间段内没有可用数据",
+      "inputTokens": "输入 Token",
+      "outputTokens": "输出 Token",
+      "totalTokens": "总 Token"
+    },
+    "devices": {
+      "title": "设备",
+      "description": "每个设备的 Token 使用量",
+      "noDevices": "还没有设备上报数据",
+      "lastReport": "最后上报",
+      "in": "输入",
+      "out": "输出"
     }
   },
   "settings": {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,8 +21,9 @@ interface User {
 export default function DashboardClient({ user }: { user: User }) {
   const router = useRouter();
   const t = useTranslations();
+  const locale = useLocale();
   const [stats, setStats] = useState<any>(null);
-  const [range, setRange] = useState('7d');
+  const [range, setRange] = useState('1d');
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
@@ -54,26 +55,26 @@ export default function DashboardClient({ user }: { user: User }) {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Activity className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{t('common.appName')}</h1>
-                <p className="text-sm text-gray-500">{t('common.appDescription')}</p>
+              <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{t('common.appName')}</h1>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">{t('common.appDescription')}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <span className="text-xs sm:text-sm text-gray-600 hidden md:inline">
                 {t('common.welcome')}, <span className="font-medium">{user.username}</span>
               </span>
-              <LanguageSwitcher />
-              <Button variant="outline" size="sm" onClick={() => router.push('/settings')}>
-                <Settings className="h-4 w-4 mr-2" />
-                {t('common.settings')}
+              <LanguageSwitcher currentLocale={locale} />
+              <Button variant="outline" size="sm" onClick={() => router.push('/settings')} className="flex-shrink-0">
+                <Settings className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{t('common.settings')}</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                {t('common.logout')}
+              <Button variant="outline" size="sm" onClick={handleLogout} className="flex-shrink-0">
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{t('common.logout')}</span>
               </Button>
             </div>
           </div>
@@ -82,26 +83,28 @@ export default function DashboardClient({ user }: { user: User }) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">
-              <Database className="h-4 w-4 mr-2" />
-              {t('dashboard.tabs.overview')}
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">
+              <Database className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('dashboard.tabs.overview')}</span>
             </TabsTrigger>
-            <TabsTrigger value="devices">
-              <Cpu className="h-4 w-4 mr-2" />
-              {t('dashboard.tabs.devices')}
+            <TabsTrigger value="devices" className="text-xs sm:text-sm">
+              <Cpu className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('dashboard.tabs.devices')}</span>
             </TabsTrigger>
-            <TabsTrigger value="api-keys">
-              {t('dashboard.tabs.apiKeys')}
+            <TabsTrigger value="api-keys" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">{t('dashboard.tabs.apiKeys')}</span>
+              <span className="sm:hidden">API</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 size="sm"
                 variant={range === '1d' ? 'default' : 'outline'}
                 onClick={() => setRange('1d')}
+                className="flex-shrink-0"
               >
                 {t('dashboard.timeRange.1d')}
               </Button>
@@ -109,6 +112,7 @@ export default function DashboardClient({ user }: { user: User }) {
                 size="sm"
                 variant={range === '7d' ? 'default' : 'outline'}
                 onClick={() => setRange('7d')}
+                className="flex-shrink-0"
               >
                 {t('dashboard.timeRange.7d')}
               </Button>
@@ -116,6 +120,7 @@ export default function DashboardClient({ user }: { user: User }) {
                 size="sm"
                 variant={range === '30d' ? 'default' : 'outline'}
                 onClick={() => setRange('30d')}
+                className="flex-shrink-0"
               >
                 {t('dashboard.timeRange.30d')}
               </Button>
@@ -123,6 +128,7 @@ export default function DashboardClient({ user }: { user: User }) {
                 size="sm"
                 variant={range === 'all' ? 'default' : 'outline'}
                 onClick={() => setRange('all')}
+                className="flex-shrink-0"
               >
                 {t('dashboard.timeRange.all')}
               </Button>

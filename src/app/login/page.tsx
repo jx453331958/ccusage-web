@@ -2,17 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import { getLocale } from '@/lib/locale';
 
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations('login');
+  const locale = useLocale();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -48,7 +48,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="absolute top-4 right-4">
-        <LanguageSwitcher />
+        <LanguageSwitcher currentLocale={locale} />
       </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">

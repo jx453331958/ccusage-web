@@ -6,21 +6,25 @@ A web-based monitoring dashboard for Claude Code token usage across multiple dev
 
 ## Features
 
-- Real-time token usage monitoring (similar to ccusage CLI)
-- Multi-device support with agent-based reporting
-- Admin authentication system
-- Interactive dashboard with usage statistics and trends
-- RESTful API for data ingestion
-- Docker deployment ready
-- SQLite database with automatic initialization
+- 🌍 **Full i18n support** - Complete English and Chinese localization
+- 📊 **Real-time token usage monitoring** - Track Claude Code usage across all devices
+- 🖥️ **Multi-device support** - Agent-based reporting from multiple machines
+- 🔐 **Secure authentication** - JWT-based admin system with password management
+- 📈 **Interactive dashboard** - Beautiful charts with usage statistics and trends
+- 🔑 **API key management** - Create and manage device-specific API keys
+- ⚙️ **Settings panel** - Change password and manage account settings
+- 🚀 **Docker ready** - One-command deployment with docker-compose
+- 💾 **SQLite database** - Automatic initialization and data persistence
+- 📱 **Responsive design** - Works seamlessly on desktop and mobile devices
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15 (App Router), React 19, TypeScript
 - **UI**: shadcn/ui, Tailwind CSS, Recharts
+- **i18n**: next-intl for internationalization
 - **Backend**: Next.js API Routes
 - **Database**: SQLite (better-sqlite3)
-- **Authentication**: JWT with bcrypt
+- **Authentication**: JWT with bcrypt password hashing
 - **Deployment**: Docker + docker-compose
 
 ## Quick Start
@@ -52,6 +56,8 @@ npm run dev
 5. Open http://localhost:3000 and login with default credentials:
    - Username: `admin`
    - Password: `admin123` (or what you set in `.env`)
+
+6. The dashboard supports English and Chinese - use the language switcher in the top right corner
 
 ### Docker Deployment
 
@@ -116,6 +122,18 @@ Content-Type: application/json
 **Logout**
 ```http
 POST /api/auth/logout
+```
+
+**Change Password**
+```http
+POST /api/auth/change-password
+Cookie: auth_token=JWT_TOKEN
+Content-Type: application/json
+
+{
+  "currentPassword": "admin123",
+  "newPassword": "newpassword123"
+}
 ```
 
 ### Usage Reporting (Agent API)
@@ -183,6 +201,7 @@ Cookie: auth_token=JWT_TOKEN
 | `JWT_SECRET` | Secret key for JWT signing | Required in production |
 | `ADMIN_USERNAME` | Default admin username | `admin` |
 | `ADMIN_PASSWORD` | Default admin password | `admin123` |
+| `COOKIE_SECURE` | Enable secure cookies (HTTPS) | `false` |
 | `PORT` | Server port | `3000` |
 
 ## Project Structure

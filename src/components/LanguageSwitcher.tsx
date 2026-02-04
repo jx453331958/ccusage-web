@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,7 +20,6 @@ interface LanguageSwitcherProps {
 }
 
 export default function LanguageSwitcher({ currentLocale = 'en' }: LanguageSwitcherProps) {
-  const router = useRouter();
   const [locale, setLocale] = useState(currentLocale);
 
   const handleLanguageChange = async (newLocale: string) => {
@@ -34,8 +32,8 @@ export default function LanguageSwitcher({ currentLocale = 'en' }: LanguageSwitc
       body: JSON.stringify({ locale: newLocale }),
     });
 
-    // Refresh to apply new locale
-    router.refresh();
+    // Force full page reload to apply new locale
+    window.location.reload();
   };
 
   const currentLanguage = languages.find((lang) => lang.code === locale) || languages[0];
