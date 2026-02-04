@@ -66,18 +66,21 @@
     },
     "usageTrend": {
       "title": "Usage Trend",
-      "description": "Daily token usage over time",
-      "descriptionHourly": "Hourly token usage over time",
+      "description": "Token usage over time",
       "noData": "No data available for the selected period",
       "inputTokens": "Input Tokens",
       "outputTokens": "Output Tokens",
       "totalTokens": "Total Tokens",
-      "chartSettings": "Chart Settings",
-      "xAxis": {
-        "tickCount": "X-Axis Labels",
-        "labelAngle": "Label Angle",
+      "intervalLabel": "Data Interval",
+      "currentInterval": "Current",
+      "interval": {
         "auto": "Auto",
-        "all": "All"
+        "1m": "1 min",
+        "5m": "5 min",
+        "15m": "15 min",
+        "30m": "30 min",
+        "1h": "1 hour",
+        "1d": "1 day"
       }
     },
     "modelBreakdown": {

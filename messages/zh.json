@@ -66,18 +66,21 @@
     },
     "usageTrend": {
       "title": "使用趋势",
-      "description": "每日 Token 使用量",
-      "descriptionHourly": "每小时 Token 使用量",
+      "description": "Token 使用量趋势",
       "noData": "所选时间段内没有可用数据",
       "inputTokens": "输入 Token",
       "outputTokens": "输出 Token",
       "totalTokens": "总 Token",
-      "chartSettings": "图表设置",
-      "xAxis": {
-        "tickCount": "X 轴标签数量",
-        "labelAngle": "标签角度",
+      "intervalLabel": "数据间隔",
+      "currentInterval": "当前",
+      "interval": {
         "auto": "自动",
-        "all": "全部"
+        "1m": "1 分钟",
+        "5m": "5 分钟",
+        "15m": "15 分钟",
+        "30m": "30 分钟",
+        "1h": "1 小时",
+        "1d": "1 天"
       }
     },
     "modelBreakdown": {

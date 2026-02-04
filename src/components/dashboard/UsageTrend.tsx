@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { formatNumber } from '@/lib/utils';
-import { Settings2 } from 'lucide-react';
+import type { Interval } from './DashboardClient';
 
 interface TrendData {
   date: string;
@@ -17,120 +16,72 @@ interface TrendData {
 
 interface UsageTrendProps {
   trendData: TrendData[];
-  granularity?: 'hourly' | 'daily';
+  interval: Interval;
+  effectiveInterval: string;
+  onIntervalChange: (interval: Interval) => void;
 }
 
-type XAxisTickCount = 'auto' | 'all' | '5' | '10' | '15' | '20';
-
-// Format date for X-axis based on granularity
-function formatXAxis(date: string, granularity: 'hourly' | 'daily'): string {
-  if (granularity === 'hourly') {
-    // date is "YYYY-MM-DD HH:00", extract time part
-    const timePart = date.split(' ')[1];
-    return timePart || date;
+// Format date for X-axis based on interval
+function formatXAxis(date: string, interval: string): string {
+  if (interval === '1d') {
+    // date is "YYYY-MM-DD", extract month-day
+    const parts = date.split('-');
+    if (parts.length === 3) {
+      return `${parts[1]}-${parts[2]}`;
+    }
+    return date;
   }
-  // date is "YYYY-MM-DD", extract month-day
-  const parts = date.split('-');
-  if (parts.length === 3) {
-    return `${parts[1]}-${parts[2]}`;
+  // date is "YYYY-MM-DD HH:MM", show time or date+time based on format
+  const parts = date.split(' ');
+  if (parts.length === 2) {
+    return parts[1]; // Show only time part (HH:MM)
   }
   return date;
 }
 
-// Calculate interval based on tick count setting
-function calculateInterval(dataLength: number, tickCount: XAxisTickCount): number | 'preserveStartEnd' {
-  if (tickCount === 'auto') {
-    return 'preserveStartEnd';
-  }
-  if (tickCount === 'all') {
-    return 0;
-  }
-  const count = parseInt(tickCount, 10);
-  if (dataLength <= count) {
-    return 0;
-  }
-  return Math.ceil(dataLength / count) - 1;
-}
+const INTERVAL_OPTIONS: { value: Interval; labelKey: string }[] = [
+  { value: 'auto', labelKey: 'auto' },
+  { value: '1m', labelKey: '1m' },
+  { value: '5m', labelKey: '5m' },
+  { value: '15m', labelKey: '15m' },
+  { value: '30m', labelKey: '30m' },
+  { value: '1h', labelKey: '1h' },
+  { value: '1d', labelKey: '1d' },
+];
 
-export default function UsageTrend({ trendData, granularity = 'daily' }: UsageTrendProps) {
+export default function UsageTrend({ trendData, interval, effectiveInterval, onIntervalChange }: UsageTrendProps) {
   const t = useTranslations('dashboard.usageTrend');
-  const [showSettings, setShowSettings] = useState(false);
-  const [xAxisTickCount, setXAxisTickCount] = useState<XAxisTickCount>('auto');
-  const [xAxisAngle, setXAxisAngle] = useState<number>(0);
 
-  const description = granularity === 'hourly' ? t('descriptionHourly') : t('description');
-  const interval = calculateInterval(trendData.length, xAxisTickCount);
-
-  const tickCountOptions: { value: XAxisTickCount; label: string }[] = [
-    { value: 'auto', label: t('xAxis.auto') },
-    { value: 'all', label: t('xAxis.all') },
-    { value: '5', label: '5' },
-    { value: '10', label: '10' },
-    { value: '15', label: '15' },
-    { value: '20', label: '20' },
-  ];
-
-  const angleOptions: { value: number; label: string }[] = [
-    { value: 0, label: '0°' },
-    { value: -30, label: '-30°' },
-    { value: -45, label: '-45°' },
-    { value: -90, label: '-90°' },
-  ];
+  // Calculate dynamic interval for X-axis ticks
+  const dataLength = trendData.length;
+  const tickInterval = dataLength > 20 ? Math.ceil(dataLength / 15) - 1 : 0;
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="flex flex-col gap-4">
           <div>
             <CardTitle>{t('title')}</CardTitle>
-            <CardDescription>{description}</CardDescription>
+            <CardDescription>
+              {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}
+            </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex-shrink-0 w-full sm:w-auto"
-          >
-            <Settings2 className="h-4 w-4 mr-2" />
-            {t('chartSettings')}
-          </Button>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">{t('intervalLabel')}</label>
+            <div className="flex flex-wrap gap-2">
+              {INTERVAL_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  size="sm"
+                  variant={interval === option.value ? 'default' : 'outline'}
+                  onClick={() => onIntervalChange(option.value)}
+                >
+                  {t(`interval.${option.labelKey}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
-
-        {showSettings && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">{t('xAxis.tickCount')}</label>
-              <div className="flex flex-wrap gap-2">
-                {tickCountOptions.map((option) => (
-                  <Button
-                    key={option.value}
-                    size="sm"
-                    variant={xAxisTickCount === option.value ? 'default' : 'outline'}
-                    onClick={() => setXAxisTickCount(option.value)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">{t('xAxis.labelAngle')}</label>
-              <div className="flex flex-wrap gap-2">
-                {angleOptions.map((option) => (
-                  <Button
-                    key={option.value}
-                    size="sm"
-                    variant={xAxisAngle === option.value ? 'default' : 'outline'}
-                    onClick={() => setXAxisAngle(option.value)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </CardHeader>
       <CardContent className="overflow-x-auto">
         {trendData.length === 0 ? (
@@ -139,17 +90,14 @@ export default function UsageTrend({ trendData, granularity = 'daily' }: UsageTr
           </div>
         ) : (
           <div className="min-w-[300px] w-full">
-            <ResponsiveContainer width="100%" height={xAxisAngle !== 0 ? 350 : 300}>
-              <LineChart data={trendData} margin={{ bottom: xAxisAngle !== 0 ? 50 : 5 }}>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
                   tick={{ fontSize: 12 }}
-                  interval={interval}
-                  angle={xAxisAngle}
-                  textAnchor={xAxisAngle !== 0 ? 'end' : 'middle'}
-                  height={xAxisAngle !== 0 ? 80 : 30}
-                  tickFormatter={(value) => formatXAxis(value, granularity)}
+                  interval={tickInterval}
+                  tickFormatter={(value) => formatXAxis(value, effectiveInterval)}
                 />
                 <YAxis
                   tickFormatter={(value) => formatNumber(value)}
@@ -167,6 +115,7 @@ export default function UsageTrend({ trendData, granularity = 'daily' }: UsageTr
                   stroke="#3b82f6"
                   name={t('inputTokens')}
                   strokeWidth={2}
+                  dot={dataLength <= 30}
                 />
                 <Line
                   type="monotone"
@@ -174,6 +123,7 @@ export default function UsageTrend({ trendData, granularity = 'daily' }: UsageTr
                   stroke="#10b981"
                   name={t('outputTokens')}
                   strokeWidth={2}
+                  dot={dataLength <= 30}
                 />
                 <Line
                   type="monotone"
@@ -181,6 +131,7 @@ export default function UsageTrend({ trendData, granularity = 'daily' }: UsageTr
                   stroke="#8b5cf6"
                   name={t('totalTokens')}
                   strokeWidth={2}
+                  dot={dataLength <= 30}
                 />
               </LineChart>
             </ResponsiveContainer>

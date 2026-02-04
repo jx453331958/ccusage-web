@@ -19,18 +19,21 @@ interface User {
   username: string;
 }
 
+export type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d' | 'auto';
+
 export default function DashboardClient({ user }: { user: User }) {
   const router = useRouter();
   const t = useTranslations();
   const locale = useLocale();
   const [stats, setStats] = useState<any>(null);
   const [range, setRange] = useState('1d');
+  const [interval, setInterval] = useState<Interval>('auto');
   const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/usage/stats?range=${range}`);
+      const res = await fetch(`/api/usage/stats?range=${range}&interval=${interval}`);
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -44,7 +47,7 @@ export default function DashboardClient({ user }: { user: User }) {
 
   useEffect(() => {
     fetchStats();
-  }, [range]);
+  }, [range, interval]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -142,7 +145,12 @@ export default function DashboardClient({ user }: { user: User }) {
             ) : stats ? (
               <>
                 <StatsOverview stats={stats.totalStats} />
-                <UsageTrend trendData={stats.trendData} granularity={stats.granularity} />
+                <UsageTrend
+                  trendData={stats.trendData}
+                  interval={interval}
+                  effectiveInterval={stats.interval}
+                  onIntervalChange={setInterval}
+                />
                 <ModelBreakdown modelStats={stats.modelStats || []} />
               </>
             ) : null}
