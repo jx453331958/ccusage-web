@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/utils';
 import type { Interval } from './DashboardClient';
 
 interface TrendData {
-  date: string;
+  timestamp: number;
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
@@ -21,22 +21,27 @@ interface UsageTrendProps {
   onIntervalChange: (interval: Interval) => void;
 }
 
-// Format date for X-axis based on interval
-function formatXAxis(date: string, interval: string): string {
+// Format timestamp for X-axis based on interval (uses browser's local timezone)
+function formatXAxis(timestamp: number, interval: string): string {
+  const date = new Date(timestamp * 1000);
+
   if (interval === '1d') {
-    // date is "YYYY-MM-DD", extract month-day
-    const parts = date.split('-');
-    if (parts.length === 3) {
-      return `${parts[1]}-${parts[2]}`;
-    }
-    return date;
+    // Show month-day for daily interval
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${month}-${day}`;
   }
-  // date is "YYYY-MM-DD HH:MM", show time or date+time based on format
-  const parts = date.split(' ');
-  if (parts.length === 2) {
-    return parts[1]; // Show only time part (HH:MM)
-  }
-  return date;
+
+  // Show time (HH:MM) for minute/hour intervals
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+// Format timestamp for tooltip (full date and time)
+function formatTooltipLabel(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString();
 }
 
 const INTERVAL_OPTIONS: { value: Interval; labelKey: string }[] = [
@@ -94,7 +99,7 @@ export default function UsageTrend({ trendData, interval, effectiveInterval, onI
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="date"
+                  dataKey="timestamp"
                   tick={{ fontSize: 12 }}
                   interval={tickInterval}
                   tickFormatter={(value) => formatXAxis(value, effectiveInterval)}
@@ -106,6 +111,7 @@ export default function UsageTrend({ trendData, interval, effectiveInterval, onI
                 />
                 <Tooltip
                   formatter={(value: number) => formatNumber(value)}
+                  labelFormatter={(value: number) => formatTooltipLabel(value)}
                   labelStyle={{ color: '#000' }}
                 />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />

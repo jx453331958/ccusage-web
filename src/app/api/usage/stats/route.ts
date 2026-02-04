@@ -19,34 +19,19 @@ function getIntervalMinutes(interval: Interval): number {
 
 function buildTrendQuery(interval: Interval): string {
   const minutes = getIntervalMinutes(interval);
-
-  if (interval === '1d') {
-    // Daily aggregation
-    return `
-      SELECT
-        DATE(timestamp, 'unixepoch') as date,
-        SUM(input_tokens) as input_tokens,
-        SUM(output_tokens) as output_tokens,
-        SUM(total_tokens) as total_tokens
-      FROM usage_records
-      WHERE timestamp >= ?
-      GROUP BY date
-      ORDER BY date ASC
-    `;
-  }
-
-  // Minute-based aggregation: floor timestamp to interval boundary
   const intervalSeconds = minutes * 60;
+
+  // Return the floored timestamp for frontend to format in user's timezone
   return `
     SELECT
-      strftime('%Y-%m-%d %H:%M', (timestamp / ${intervalSeconds}) * ${intervalSeconds}, 'unixepoch') as date,
+      (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
       SUM(input_tokens) as input_tokens,
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens
     FROM usage_records
     WHERE timestamp >= ?
     GROUP BY (timestamp / ${intervalSeconds})
-    ORDER BY date ASC
+    ORDER BY timestamp ASC
   `;
 }
 
