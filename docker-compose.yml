@@ -4,6 +4,7 @@ services:
   ccusage-web:
     build: .
     container_name: ccusage-web
+    user: "1001:1001"
     ports:
       - "${PORT:-3000}:3000"
     environment:
