@@ -31,6 +31,7 @@ interface UsageTrendProps {
   interval: Interval;
   effectiveInterval: string;
   onIntervalChange: (interval: Interval) => void;
+  loading?: boolean;
 }
 
 const INTERVAL_OPTIONS: { value: Interval; labelKey: string }[] = [
@@ -77,6 +78,7 @@ export default function UsageTrend({
   interval,
   effectiveInterval,
   onIntervalChange,
+  loading = false,
 }: UsageTrendProps) {
   const t = useTranslations('dashboard.usageTrend');
   const [viewMode, setViewMode] = useState<ViewMode>('total');
@@ -311,12 +313,17 @@ export default function UsageTrend({
         </div>
       </CardHeader>
       <CardContent>
-        {trendData.length === 0 ? (
+        {trendData.length === 0 && !loading ? (
           <div className="text-center py-12 text-muted-foreground">
             {t('noData')}
           </div>
         ) : (
-          <div className="w-full">
+          <div className="w-full relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
+                <div className="text-sm text-gray-500">Loading...</div>
+              </div>
+            )}
             <ReactECharts
               option={chartOption}
               style={{ height: '400px', width: '100%' }}

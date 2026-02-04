@@ -34,10 +34,12 @@ export default function DashboardClient({ user }: { user: User }) {
   const [customDateRange, setCustomDateRange] = useState<{ from: Date; to: Date } | null>(null);
   const [interval, setInterval] = useState<Interval>('auto');
   const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
+  const isInitialLoad = useRef(true);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -50,29 +52,38 @@ export default function DashboardClient({ user }: { user: User }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fetchStats = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+  // Build URL for API call
+  const buildStatsUrl = useCallback((intervalOverride?: Interval) => {
+    const effectiveInterval = intervalOverride ?? interval;
+    let url = `/api/usage/stats?interval=${effectiveInterval}`;
+
+    if (rangeType === 'today') {
+      url += '&range=today';
+    } else if (rangeType === '7d') {
+      url += '&range=7d';
+    } else if (rangeType === '30d') {
+      url += '&range=30d';
+    } else if (rangeType === 'custom' && customDateRange) {
+      const from = Math.floor(customDateRange.from.getTime() / 1000);
+      const to = Math.floor(customDateRange.to.getTime() / 1000) + 86400 - 1;
+      url += `&from=${from}&to=${to}`;
+    }
+
+    if (selectedDevice) {
+      url += `&device=${encodeURIComponent(selectedDevice)}`;
+    }
+
+    return url;
+  }, [rangeType, customDateRange, interval, selectedDevice]);
+
+  // Full fetch - shows loading state, updates all data
+  const fetchStats = useCallback(async () => {
+    // Only show full loading on initial load
+    if (isInitialLoad.current) {
+      setLoading(true);
+    }
     try {
-      let url = `/api/usage/stats?interval=${interval}`;
-
-      if (rangeType === 'today') {
-        url += '&range=today';
-      } else if (rangeType === '7d') {
-        url += '&range=7d';
-      } else if (rangeType === '30d') {
-        url += '&range=30d';
-      } else if (rangeType === 'custom' && customDateRange) {
-        const from = Math.floor(customDateRange.from.getTime() / 1000);
-        const to = Math.floor(customDateRange.to.getTime() / 1000) + 86400 - 1; // End of day
-        url += `&from=${from}&to=${to}`;
-      }
-
-      // Add device filter if selected
-      if (selectedDevice) {
-        url += `&device=${encodeURIComponent(selectedDevice)}`;
-      }
-
-      const res = await fetch(url);
+      const res = await fetch(buildStatsUrl());
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -81,17 +92,42 @@ export default function DashboardClient({ user }: { user: User }) {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
-  }, [rangeType, customDateRange, interval, selectedDevice]);
+  }, [buildStatsUrl]);
 
+  // Fetch only trend data when interval changes - no full page loading
+  const fetchTrendData = useCallback(async (newInterval: Interval) => {
+    setChartLoading(true);
+    try {
+      const res = await fetch(buildStatsUrl(newInterval));
+      if (res.ok) {
+        const data = await res.json();
+        // Only update trend-related data, keep totalStats unchanged
+        setStats((prev: any) => prev ? {
+          ...prev,
+          trendData: data.trendData,
+          modelTrendData: data.modelTrendData,
+          interval: data.interval,
+        } : data);
+      }
+    } catch (error) {
+      console.error('Error fetching trend data:', error);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [buildStatsUrl]);
+
+  // Initial load and when filter params change (except interval)
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+  }, [rangeType, customDateRange, selectedDevice]); // Note: interval not included
 
-  // Handle interval change without showing loading
+  // Handle interval change - only update chart, no full page reload
   const handleIntervalChange = useCallback((newInterval: Interval) => {
     setInterval(newInterval);
-  }, []);
+    fetchTrendData(newInterval);
+  }, [fetchTrendData]);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -289,6 +325,7 @@ export default function DashboardClient({ user }: { user: User }) {
                   interval={interval}
                   effectiveInterval={stats.interval}
                   onIntervalChange={handleIntervalChange}
+                  loading={chartLoading}
                 />
               </>
             ) : null}
