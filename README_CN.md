@@ -362,10 +362,6 @@ ccusage-web/
 ### 一键安装代理
 ![一键安装](screenshots/one-click-install.png)
 
-## 贡献
-
-欢迎贡献！请随时提交 Pull Request。
-
 ## 许可证
 
 MIT License

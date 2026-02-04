@@ -352,10 +352,6 @@ ccusage-web/
 ### One-Click Agent Installation
 ![One-Click Install](screenshots/one-click-install.png)
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## License
 
 MIT License
