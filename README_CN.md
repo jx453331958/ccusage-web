@@ -41,7 +41,40 @@ git clone git@github.com:jx453331958/ccusage-web.git
 cd ccusage-web
 ```
 
-2. 配置环境变量：
+2. 一键部署：
+```bash
+./deploy.sh deploy
+```
+
+脚本会自动：
+- 检查 Docker 是否可用
+- 创建 `.env` 文件（会提示你编辑配置）
+- 创建数据目录
+- 构建并启动容器
+
+3. 访问仪表板 http://localhost:3000
+   - 使用配置的凭据登录
+   - SQLite 数据库存储在 `./data/ccusage.db`
+
+#### 部署脚本命令
+
+```bash
+./deploy.sh deploy   # 首次部署
+./deploy.sh update   # 拉取最新代码并重新构建
+./deploy.sh start    # 启动服务
+./deploy.sh stop     # 停止服务
+./deploy.sh restart  # 重启服务
+./deploy.sh status   # 查看状态和最近日志
+./deploy.sh logs     # 查看实时日志
+./deploy.sh backup   # 备份数据库
+./deploy.sh clean    # 删除容器和镜像
+```
+
+#### 手动 Docker 部署
+
+如果你更喜欢手动配置：
+
+1. 配置环境变量：
 ```bash
 cp .env.example .env
 nano .env  # 编辑配置
@@ -55,14 +88,12 @@ ADMIN_PASSWORD=你的安全密码
 COOKIE_SECURE=false  # 如果使用 HTTPS 请设为 true
 ```
 
-3. 使用 Docker Compose 启动：
+2. 使用 Docker Compose 启动：
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
-4. 访问仪表板 http://localhost:3000
-   - 使用配置的凭据登录
-   - SQLite 数据库存储在 `./data/ccusage.db`
+3. 访问仪表板 http://localhost:3000
 
 #### 方式 B: 开发模式部署
 

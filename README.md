@@ -41,7 +41,40 @@ git clone git@github.com:jx453331958/ccusage-web.git
 cd ccusage-web
 ```
 
-2. Configure environment variables:
+2. One-command deployment:
+```bash
+./deploy.sh deploy
+```
+
+The script will:
+- Check Docker availability
+- Create `.env` file (you'll be prompted to edit it)
+- Create data directory
+- Build and start the container
+
+3. Access the dashboard at http://localhost:3000
+   - Login with your configured credentials
+   - The SQLite database will be stored in `./data/ccusage.db`
+
+#### Deploy Script Commands
+
+```bash
+./deploy.sh deploy   # First-time deployment
+./deploy.sh update   # Pull latest code and rebuild
+./deploy.sh start    # Start the service
+./deploy.sh stop     # Stop the service
+./deploy.sh restart  # Restart the service
+./deploy.sh status   # Show status and recent logs
+./deploy.sh logs     # Follow container logs
+./deploy.sh backup   # Backup the database
+./deploy.sh clean    # Remove containers and images
+```
+
+#### Manual Docker Deployment
+
+If you prefer manual setup:
+
+1. Configure environment variables:
 ```bash
 cp .env.example .env
 nano .env  # Edit with your settings
@@ -55,14 +88,12 @@ ADMIN_PASSWORD=your-secure-password
 COOKIE_SECURE=false  # Set to true if using HTTPS
 ```
 
-3. Start with Docker Compose:
+2. Start with Docker Compose:
 ```bash
-docker-compose up -d
+docker compose up -d --build
 ```
 
-4. Access the dashboard at http://localhost:3000
-   - Login with your configured credentials
-   - The SQLite database will be stored in `./data/ccusage.db`
+3. Access the dashboard at http://localhost:3000
 
 #### Option B: Development Setup
 
