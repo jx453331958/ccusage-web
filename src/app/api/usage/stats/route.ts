@@ -35,6 +35,91 @@ function buildTrendQuery(interval: Interval, hasDevice: boolean): string {
   `;
 }
 
+// Generate complete time series with empty data points filled
+function generateCompleteTimeSeries(
+  trendData: { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number }[],
+  startTime: number,
+  endTime: number,
+  interval: Interval
+): { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number }[] {
+  const intervalSeconds = getIntervalMinutes(interval) * 60;
+
+  // Align start time to interval boundary
+  const alignedStart = Math.floor(startTime / intervalSeconds) * intervalSeconds;
+  // For end time, use current time but don't exceed it
+  const alignedEnd = Math.floor(endTime / intervalSeconds) * intervalSeconds;
+
+  // Create a map for quick lookup
+  const dataMap = new Map<number, { input_tokens: number; output_tokens: number; total_tokens: number }>();
+  for (const item of trendData) {
+    dataMap.set(item.timestamp, {
+      input_tokens: item.input_tokens,
+      output_tokens: item.output_tokens,
+      total_tokens: item.total_tokens,
+    });
+  }
+
+  // Generate complete time series
+  const result: { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number }[] = [];
+  for (let ts = alignedStart; ts <= alignedEnd; ts += intervalSeconds) {
+    const data = dataMap.get(ts);
+    result.push({
+      timestamp: ts,
+      input_tokens: data?.input_tokens || 0,
+      output_tokens: data?.output_tokens || 0,
+      total_tokens: data?.total_tokens || 0,
+    });
+  }
+
+  return result;
+}
+
+// Generate complete time series for model trend data
+function generateCompleteModelTimeSeries(
+  modelTrendData: { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number }[],
+  startTime: number,
+  endTime: number,
+  interval: Interval
+): { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number }[] {
+  const intervalSeconds = getIntervalMinutes(interval) * 60;
+
+  // Align start time to interval boundary
+  const alignedStart = Math.floor(startTime / intervalSeconds) * intervalSeconds;
+  const alignedEnd = Math.floor(endTime / intervalSeconds) * intervalSeconds;
+
+  // Get all unique models
+  const models = [...new Set(modelTrendData.map(d => d.model))];
+
+  // Create a map for quick lookup: "timestamp-model" -> data
+  const dataMap = new Map<string, { input_tokens: number; output_tokens: number; total_tokens: number }>();
+  for (const item of modelTrendData) {
+    const key = `${item.timestamp}-${item.model}`;
+    dataMap.set(key, {
+      input_tokens: item.input_tokens,
+      output_tokens: item.output_tokens,
+      total_tokens: item.total_tokens,
+    });
+  }
+
+  // Generate complete time series for each model
+  const result: { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number }[] = [];
+  for (let ts = alignedStart; ts <= alignedEnd; ts += intervalSeconds) {
+    for (const model of models) {
+      const key = `${ts}-${model}`;
+      const data = dataMap.get(key);
+      result.push({
+        timestamp: ts,
+        model,
+        input_tokens: data?.input_tokens || 0,
+        output_tokens: data?.output_tokens || 0,
+        total_tokens: data?.total_tokens || 0,
+      });
+    }
+  }
+
+  return result;
+}
+
 function buildModelTrendQuery(interval: Interval, hasDevice: boolean): string {
   const minutes = getIntervalMinutes(interval);
   const intervalSeconds = minutes * 60;
@@ -115,13 +200,12 @@ export async function GET(request: NextRequest) {
   const hasDevice = !!deviceParam;
   const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
 
-  // Get list of all available devices (unfiltered by device selection)
+  // Get list of all available devices (unfiltered by time range and device selection)
   const availableDevices = db.prepare(`
     SELECT DISTINCT device_name
     FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ?
     ORDER BY device_name ASC
-  `).all(startTime, endTime) as { device_name: string }[];
+  `).all() as { device_name: string }[];
 
   // Base query params
   const baseParams = hasDevice ? [startTime, endTime, deviceParam] : [startTime, endTime];
@@ -154,17 +238,28 @@ export async function GET(request: NextRequest) {
 
   // Get trend data with selected interval (filtered by device if specified)
   const trendQuery = buildTrendQuery(effectiveInterval, hasDevice);
-  const trendData = db.prepare(trendQuery).all(...baseParams);
+  const trendDataRaw = db.prepare(trendQuery).all(...baseParams) as {
+    timestamp: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  }[];
+
+  // Fill in missing time points with zero values
+  const trendData = generateCompleteTimeSeries(trendDataRaw, startTime, endTime, effectiveInterval);
 
   // Get model trend data (for per-model charts, filtered by device if specified)
   const modelTrendQuery = buildModelTrendQuery(effectiveInterval, hasDevice);
-  const modelTrendRaw = db.prepare(modelTrendQuery).all(...baseParams) as {
+  const modelTrendRawData = db.prepare(modelTrendQuery).all(...baseParams) as {
     timestamp: number;
     model: string;
     input_tokens: number;
     output_tokens: number;
     total_tokens: number;
   }[];
+
+  // Fill in missing time points for model trend data
+  const modelTrendRaw = generateCompleteModelTimeSeries(modelTrendRawData, startTime, endTime, effectiveInterval);
 
   // Get per-model stats (filtered by device if specified, exclude unknown models)
   const modelStats = db.prepare(`
