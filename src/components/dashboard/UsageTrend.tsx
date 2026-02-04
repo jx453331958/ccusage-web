@@ -272,7 +272,7 @@ export default function UsageTrend({
       <CardHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <CardTitle>{t('title')}</CardTitle>
               <CardDescription>
                 {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}

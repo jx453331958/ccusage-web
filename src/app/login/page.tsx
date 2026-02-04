@@ -51,7 +51,7 @@ export default function LoginPage() {
         <LanguageSwitcher currentLocale={locale} />
       </div>
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-bold">{t('title')}</CardTitle>
           <CardDescription>{t('description')}</CardDescription>
         </CardHeader>
