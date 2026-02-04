@@ -7,8 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Key, Trash2, Copy, Check } from 'lucide-react';
+import { Key, Trash2, Copy, Check, Terminal } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+
+function getServerUrl() {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return '';
+}
 
 interface ApiKey {
   id: number;
@@ -24,6 +31,7 @@ export default function ApiKeyManager() {
   const [deviceName, setDeviceName] = useState('');
   const [newKey, setNewKey] = useState<ApiKey | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [copiedCommand, setCopiedCommand] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -82,6 +90,17 @@ export default function ApiKeyManager() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const copyInstallCommand = (command: string) => {
+    navigator.clipboard.writeText(command);
+    setCopiedCommand(true);
+    setTimeout(() => setCopiedCommand(false), 2000);
+  };
+
+  const getInstallCommand = (apiKey: string) => {
+    const serverUrl = getServerUrl();
+    return `curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`;
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -130,10 +149,45 @@ export default function ApiKeyManager() {
                       </Button>
                     </div>
                   </div>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Terminal className="h-4 w-4 text-blue-600" />
+                      <p className="text-sm font-medium text-blue-900">
+                        {t('installTitle')}
+                      </p>
+                    </div>
+                    <p className="text-xs text-blue-700 mb-3">
+                      {t('installDescription')}
+                    </p>
+                    <div className="relative">
+                      <pre className="p-3 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                        {getInstallCommand(newKey.key)}
+                      </pre>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="absolute top-2 right-2"
+                        onClick={() => copyInstallCommand(getInstallCommand(newKey.key))}
+                      >
+                        {copiedCommand ? (
+                          <>
+                            <Check className="h-3 w-3 mr-1" />
+                            {t('copied')}
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3 mr-1" />
+                            {t('copyCommand')}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                   <Button
                     className="w-full"
                     onClick={() => {
                       setNewKey(null);
+                      setCopiedCommand(false);
                       setDialogOpen(false);
                     }}
                   >
