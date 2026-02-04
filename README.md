@@ -147,10 +147,32 @@ The script will:
 
 ## Agent Management
 
+### Quick Install (One-liner)
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | \
+  CCUSAGE_SERVER=http://your-server:3000 \
+  CCUSAGE_API_KEY=your-api-key \
+  REPORT_INTERVAL=5 \
+  bash -s install
+```
+
 ### Check Agent Status
 
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s status
+```
+
+### Update Agent
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s update
+```
+
+### Restart Agent
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s restart
 ```
 
 ### Uninstall Agent
@@ -159,17 +181,32 @@ curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/se
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s uninstall
 ```
 
-### Alternative: Download Script First
+### Download Script First (Recommended)
 
 If you prefer to download once and run multiple times:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
 chmod +x setup.sh
-./setup.sh install    # Install
+./setup.sh install    # Install agent
 ./setup.sh status     # Check status
-./setup.sh uninstall  # Remove
-./setup.sh run        # Test run
+./setup.sh update     # Update to latest version
+./setup.sh restart    # Restart the service
+./setup.sh config     # Edit configuration file
+./setup.sh run        # Test run once
+./setup.sh uninstall  # Remove agent
+```
+
+### Configuration File
+
+The agent stores configuration in `~/.ccusage-agent.conf`:
+
+```bash
+# Edit configuration
+./setup.sh config
+
+# Then restart to apply changes
+./setup.sh restart
 ```
 
 See [agent/README.md](agent/README.md) for manual setup and advanced configuration.

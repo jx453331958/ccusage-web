@@ -147,10 +147,32 @@ chmod +x setup.sh
 
 ## Agent 管理
 
+### 一键安装
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | \
+  CCUSAGE_SERVER=http://your-server:3000 \
+  CCUSAGE_API_KEY=your-api-key \
+  REPORT_INTERVAL=5 \
+  bash -s install
+```
+
 ### 查看 Agent 状态
 
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s status
+```
+
+### 更新 Agent
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s update
+```
+
+### 重启 Agent
+
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s restart
 ```
 
 ### 卸载 Agent
@@ -159,17 +181,32 @@ curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/se
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s uninstall
 ```
 
-### 备选方式：先下载脚本
+### 推荐方式：先下载脚本
 
 如果你想先下载脚本，然后多次使用：
 
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
 chmod +x setup.sh
-./setup.sh install    # 安装
+./setup.sh install    # 安装 agent
 ./setup.sh status     # 查看状态
-./setup.sh uninstall  # 卸载
-./setup.sh run        # 测试运行
+./setup.sh update     # 更新到最新版本
+./setup.sh restart    # 重启服务
+./setup.sh config     # 编辑配置文件
+./setup.sh run        # 测试运行一次
+./setup.sh uninstall  # 卸载 agent
+```
+
+### 配置文件
+
+Agent 的配置存储在 `~/.ccusage-agent.conf`：
+
+```bash
+# 编辑配置
+./setup.sh config
+
+# 重启以应用更改
+./setup.sh restart
 ```
 
 查看 [agent/README.md](agent/README.md) 了解手动配置和高级选项。
