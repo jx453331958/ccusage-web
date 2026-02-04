@@ -34,6 +34,7 @@ export default function ApiKeyManager() {
   const [copiedCommand, setCopiedCommand] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [installDialogKey, setInstallDialogKey] = useState<ApiKey | null>(null);
 
   const fetchApiKeys = async () => {
     const res = await fetch('/api/api-keys');
@@ -254,7 +255,16 @@ export default function ApiKeyManager() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setInstallDialogKey(apiKey)}
+                    title={t('installTitle')}
+                  >
+                    <Terminal className="h-4 w-4 text-blue-600" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() => copyToClipboard(apiKey.key)}
+                    title={t('copyKey')}
                   >
                     {copiedKey === apiKey.key ? (
                       <Check className="h-4 w-4" />
@@ -266,6 +276,7 @@ export default function ApiKeyManager() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleDeleteKey(apiKey.id)}
+                    title={t('delete')}
                   >
                     <Trash2 className="h-4 w-4 text-red-600" />
                   </Button>
@@ -275,6 +286,46 @@ export default function ApiKeyManager() {
           )}
         </div>
       </CardContent>
+
+      {/* Install Command Dialog */}
+      <Dialog open={!!installDialogKey} onOpenChange={(open) => !open && setInstallDialogKey(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('installTitle')}</DialogTitle>
+            <DialogDescription>
+              {installDialogKey?.device_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t('installDescription')}
+            </p>
+            <div className="relative">
+              <pre className="p-3 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                {installDialogKey && getInstallCommand(installDialogKey.key)}
+              </pre>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="absolute top-2 right-2"
+                onClick={() => installDialogKey && copyInstallCommand(getInstallCommand(installDialogKey.key))}
+              >
+                {copiedCommand ? (
+                  <>
+                    <Check className="h-3 w-3 mr-1" />
+                    {t('copied')}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3 mr-1" />
+                    {t('copyCommand')}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
