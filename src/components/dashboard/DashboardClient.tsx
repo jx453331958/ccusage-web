@@ -150,7 +150,7 @@ export default function DashboardClient({ user }: { user: User }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
+      <header className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -159,6 +159,36 @@ export default function DashboardClient({ user }: { user: User }) {
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{t('common.appName')}</h1>
                 <p className="text-xs sm:text-sm text-gray-500 truncate">{t('common.appDescription')}</p>
               </div>
+              {/* Tab Navigation Dropdown */}
+              <div className="h-6 w-px bg-gray-200 mx-2 hidden sm:block" />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="min-w-[120px] justify-between">
+                    <span className="flex items-center gap-2">
+                      {tabs.find(tab => tab.id === activeTab)?.icon}
+                      <span>{tabs.find(tab => tab.id === activeTab)?.label}</span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-1" align="start">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab === tab.id
+                          ? "bg-gray-100 text-gray-900"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      )}
+                    >
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
               <span className="text-xs sm:text-sm text-gray-600 hidden md:inline">
@@ -179,27 +209,6 @@ export default function DashboardClient({ user }: { user: User }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Navigation Tabs */}
-        <div className="mb-6">
-          <nav className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors",
-                  activeTab === tab.id
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                )}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">

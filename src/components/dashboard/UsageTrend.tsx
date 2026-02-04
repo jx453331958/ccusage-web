@@ -272,7 +272,7 @@ export default function UsageTrend({
       <CardHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
+            <div className="space-y-1.5">
               <CardTitle>{t('title')}</CardTitle>
               <CardDescription>
                 {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}
@@ -329,9 +329,6 @@ export default function UsageTrend({
               style={{ height: '400px', width: '100%' }}
               opts={{ renderer: 'svg' }}
             />
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              {t('zoomHint')}
-            </p>
           </div>
         )}
       </CardContent>
