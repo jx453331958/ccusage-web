@@ -38,6 +38,7 @@ export default function DashboardClient({ user }: { user: User }) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
+  const [tabDropdownOpen, setTabDropdownOpen] = useState(false);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
 
@@ -161,7 +162,7 @@ export default function DashboardClient({ user }: { user: User }) {
               </div>
               {/* Tab Navigation Dropdown */}
               <div className="h-6 w-px bg-gray-200 mx-2 hidden sm:block" />
-              <Popover>
+              <Popover open={tabDropdownOpen} onOpenChange={setTabDropdownOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="min-w-[120px] justify-between">
                     <span className="flex items-center gap-2">
@@ -175,7 +176,10 @@ export default function DashboardClient({ user }: { user: User }) {
                   {tabs.map((tab) => (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setTabDropdownOpen(false);
+                      }}
                       className={cn(
                         "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
                         activeTab === tab.id
