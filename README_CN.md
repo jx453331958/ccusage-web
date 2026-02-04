@@ -29,112 +29,101 @@
 
 ## 快速开始
 
-### 普通用户（仅安装监控 Agent）
+### 步骤 1: 部署服务器（管理员操作）
 
-如果你只想监控 Claude Code 使用情况，无需克隆仓库。直接运行一键安装命令：
+首先需要搭建监控服务器：
 
-```bash
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
-```
+#### 方式 A: Docker 部署（推荐）
 
-脚本会自动：
-- 下载并配置监控 agent
-- 提示输入服务器地址和 API 密钥（从管理员获取）
-- 自动安装为后台服务
-
-**就这么简单！** 无需 git、无需 clone、零麻烦。
-
----
-
-### 服务器部署
-
-#### 方式 1: Docker 部署（推荐）
-
-**无需 git clone！** 只需创建目录并下载配置文件：
-
-```bash
-mkdir ccusage-web && cd ccusage-web
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/docker-compose.yml -o docker-compose.yml
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/.env.example -o .env
-```
-
-编辑 `.env` 设置你的凭据：
-```bash
-nano .env  # 或使用 vim/其他编辑器
-```
-
-启动服务器：
-```bash
-docker-compose up -d
-```
-
-访问 http://localhost:3000
-
-#### 方式 2: 开发部署
-
-适用于开发或自定义部署：
-
-1. 克隆仓库:
+1. 克隆仓库：
 ```bash
 git clone git@github.com:jx453331958/ccusage-web.git
 cd ccusage-web
 ```
 
-2. 安装依赖:
+2. 配置环境变量：
 ```bash
+cp .env.example .env
+nano .env  # 编辑配置
+```
+
+推荐的 `.env` 配置：
+```bash
+JWT_SECRET=你的随机密钥-请修改
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=你的安全密码
+COOKIE_SECURE=false  # 如果使用 HTTPS 请设为 true
+```
+
+3. 使用 Docker Compose 启动：
+```bash
+docker-compose up -d
+```
+
+4. 访问仪表板 http://localhost:3000
+   - 使用配置的凭据登录
+   - SQLite 数据库存储在 `./data/ccusage.db`
+
+#### 方式 B: 开发模式部署
+
+1. 克隆并安装：
+```bash
+git clone git@github.com:jx453331958/ccusage-web.git
+cd ccusage-web
 npm install
 ```
 
-3. 配置环境变量:
+2. 配置环境变量：
 ```bash
 cp .env.example .env
-# 编辑 .env 设置你的凭据
+nano .env  # 编辑凭据
 ```
 
-4. 启动开发服务器:
+3. 启动开发服务器：
 ```bash
 npm run dev
 ```
 
-5. 打开 http://localhost:3000 并使用默认凭据登录:
-   - 用户名: `admin`
-   - 密码: `admin123` (或你在 `.env` 中设置的密码)
+4. 访问 http://localhost:3000
 
-6. 仪表板支持中英文切换 - 点击右上角的语言切换按钮
+### 步骤 2: 安装 Agent（用户操作）
 
-SQLite 数据库将存储在 `./data/ccusage.db`，容器重启后数据会保留。
+服务器运行后，用户可以安装监控 agent：
 
-## Agent 配置
+1. **从管理员获取凭据：**
+   - 服务器地址（例如：`http://your-server:3000`）
+   - API 密钥（在仪表板 → API Keys 标签页创建）
 
-### 一键安装（推荐）
-
-在仪表板的 API Keys 标签页获取 API 密钥，然后运行：
-
+2. **一键安装：**
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
 ```
 
-脚本会提示输入服务器地址和 API 密钥，然后自动：
-- 检测操作系统（macOS/Linux）
-- 安装 Node.js 监控 agent
-- 配置为后台服务（launchd/systemd/cron）
+脚本会：
+- 提示输入服务器地址和 API 密钥
+- 自动检测操作系统（macOS/Linux）
+- 安装为后台服务（launchd/systemd/cron）
 - 开始每 5 分钟上报一次使用数据
 
-### 管理 Agent
+**就这么简单！** Agent 在后台运行，自动向服务器上报数据。
 
-查看状态：
+## Agent 管理
+
+### 查看 Agent 状态
+
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s status
 ```
 
-卸载：
+### 卸载 Agent
+
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s uninstall
 ```
 
 ### 备选方式：先下载脚本
 
-如果你想先下载脚本再执行：
+如果你想先下载脚本，然后多次使用：
 
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
@@ -145,7 +134,7 @@ chmod +x setup.sh
 ./setup.sh run        # 测试运行
 ```
 
-查看 [agent/README.md](agent/README.md) 了解手动配置和更多详情。
+查看 [agent/README.md](agent/README.md) 了解手动配置和高级选项。
 
 ## API 文档
 

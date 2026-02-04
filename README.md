@@ -29,50 +29,11 @@ A web-based monitoring dashboard for Claude Code token usage across multiple dev
 
 ## Quick Start
 
-### For End Users (Agent Only)
+### Step 1: Deploy Server (For Administrators)
 
-If you just want to monitor your Claude Code usage, you don't need to clone the repository. Just use the one-liner:
+First, set up the monitoring server:
 
-```bash
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
-```
-
-This will:
-- Download and configure the monitoring agent
-- Prompt for your server URL and API key (get from your admin)
-- Install as a background service automatically
-
-**That's it!** No git, no clone, no hassle.
-
----
-
-### For Server Deployment
-
-#### Option 1: Docker (Recommended)
-
-**No git clone needed!** Just create a directory and download the docker-compose file:
-
-```bash
-mkdir ccusage-web && cd ccusage-web
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/docker-compose.yml -o docker-compose.yml
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/.env.example -o .env
-```
-
-Edit `.env` with your credentials:
-```bash
-nano .env  # or vim/any editor
-```
-
-Start the server:
-```bash
-docker-compose up -d
-```
-
-Access at http://localhost:3000
-
-#### Option 2: Development Setup
-
-For development or custom deployment:
+#### Option A: Docker Deployment (Recommended)
 
 1. Clone the repository:
 ```bash
@@ -80,61 +41,89 @@ git clone git@github.com:jx453331958/ccusage-web.git
 cd ccusage-web
 ```
 
-2. Install dependencies:
+2. Configure environment variables:
 ```bash
+cp .env.example .env
+nano .env  # Edit with your settings
+```
+
+Recommended `.env` settings:
+```bash
+JWT_SECRET=your-random-secret-key-change-this
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-password
+COOKIE_SECURE=false  # Set to true if using HTTPS
+```
+
+3. Start with Docker Compose:
+```bash
+docker-compose up -d
+```
+
+4. Access the dashboard at http://localhost:3000
+   - Login with your configured credentials
+   - The SQLite database will be stored in `./data/ccusage.db`
+
+#### Option B: Development Setup
+
+1. Clone and install:
+```bash
+git clone git@github.com:jx453331958/ccusage-web.git
+cd ccusage-web
 npm install
 ```
 
-3. Configure environment:
+2. Configure environment:
 ```bash
 cp .env.example .env
-# Edit .env and set your credentials
+nano .env  # Edit your credentials
 ```
 
-4. Run development server:
+3. Run development server:
 ```bash
 npm run dev
 ```
 
-5. Open http://localhost:3000 and login with default credentials:
-   - Username: `admin`
-   - Password: `admin123` (or what you set in `.env`)
+4. Access at http://localhost:3000
 
-6. The dashboard supports English and Chinese - use the language switcher in the top right corner
+### Step 2: Install Agent (For End Users)
 
-The SQLite database will be stored in `./data/ccusage.db` and persisted across container restarts.
+After the server is running, users can install the monitoring agent:
 
-## Agent Setup
+1. **Get credentials from admin:**
+   - Server URL (e.g., `http://your-server:3000`)
+   - API Key (create in dashboard → API Keys tab)
 
-### One-Line Installation (Recommended)
-
-Get your API key from the dashboard (API Keys tab), then run:
-
+2. **One-line installation:**
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
 ```
 
-The script will prompt for your server URL and API key, then automatically:
-- Detect your OS (macOS/Linux)
-- Install Node.js monitoring agent
-- Configure as a background service (launchd/systemd/cron)
+The script will:
+- Prompt for server URL and API key
+- Auto-detect OS (macOS/Linux)
+- Install as background service (launchd/systemd/cron)
 - Start reporting usage every 5 minutes
 
-### Managing the Agent
+**That's it!** The agent runs in the background and reports to your server automatically.
 
-Check status:
+## Agent Management
+
+### Check Agent Status
+
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s status
 ```
 
-Uninstall:
+### Uninstall Agent
+
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s uninstall
 ```
 
-### Alternative: Download Once
+### Alternative: Download Script First
 
-If you prefer to download the script first:
+If you prefer to download once and run multiple times:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
@@ -145,7 +134,7 @@ chmod +x setup.sh
 ./setup.sh run        # Test run
 ```
 
-See [agent/README.md](agent/README.md) for manual setup and more details.
+See [agent/README.md](agent/README.md) for manual setup and advanced configuration.
 
 ## API Documentation
 
