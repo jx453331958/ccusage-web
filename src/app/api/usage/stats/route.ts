@@ -49,6 +49,7 @@ function buildModelTrendQuery(interval: Interval, hasDevice: boolean): string {
       SUM(total_tokens) as total_tokens
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
+      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
     GROUP BY (timestamp / ${intervalSeconds}), model
     ORDER BY timestamp ASC, model ASC
   `;
@@ -165,7 +166,7 @@ export async function GET(request: NextRequest) {
     total_tokens: number;
   }[];
 
-  // Get per-model stats (filtered by device if specified)
+  // Get per-model stats (filtered by device if specified, exclude unknown models)
   const modelStats = db.prepare(`
     SELECT
       model,
@@ -175,6 +176,7 @@ export async function GET(request: NextRequest) {
       COUNT(*) as record_count
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
+      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
     GROUP BY model
     ORDER BY total_tokens DESC
   `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
