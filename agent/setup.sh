@@ -106,6 +106,10 @@ CCUSAGE_API_KEY="$CCUSAGE_API_KEY"
 # Report interval in minutes (1-1440, default: 5)
 REPORT_INTERVAL="$REPORT_INTERVAL"
 
+# Skip SSL certificate verification (true/false, default: false)
+# Use this if your server uses a self-signed certificate or is behind Cloudflare
+CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}"
+
 # Claude projects directory (optional, default: ~/.claude/projects)
 # CLAUDE_PROJECTS_DIR=""
 EOF
@@ -229,6 +233,8 @@ install_macos() {
         <string>$CCUSAGE_API_KEY</string>
         <key>REPORT_INTERVAL</key>
         <string>$REPORT_INTERVAL</string>
+        <key>CCUSAGE_INSECURE</key>
+        <string>${CCUSAGE_INSECURE:-false}</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -304,6 +310,7 @@ Type=simple
 Environment="CCUSAGE_SERVER=$CCUSAGE_SERVER"
 Environment="CCUSAGE_API_KEY=$CCUSAGE_API_KEY"
 Environment="REPORT_INTERVAL=$REPORT_INTERVAL"
+Environment="CCUSAGE_INSECURE=${CCUSAGE_INSECURE:-false}"
 ExecStart=$RUNTIME_PATH $AGENT_SCRIPT
 Restart=always
 RestartSec=60
@@ -377,7 +384,7 @@ install_cron() {
         fi
     fi
 
-    local cron_cmd="$cron_schedule CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" $RUNTIME_PATH $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
+    local cron_cmd="$cron_schedule CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" CCUSAGE_INSECURE=\"${CCUSAGE_INSECURE:-false}\" $RUNTIME_PATH $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
 
     # Remove existing entry and add new one
     (crontab -l 2>/dev/null | grep -v "ccusage-agent\|$AGENT_SCRIPT"; echo "$cron_cmd") | crontab -
@@ -572,6 +579,7 @@ cmd_help() {
     echo "  CCUSAGE_SERVER      Server URL (e.g., http://localhost:3000)"
     echo "  CCUSAGE_API_KEY     API key for authentication"
     echo "  REPORT_INTERVAL     Report interval in minutes (1-1440, default: 5)"
+    echo "  CCUSAGE_INSECURE    Skip SSL verification (true/false, for self-signed certs)"
     echo ""
     echo "Examples:"
     echo "  # Interactive installation"
@@ -603,6 +611,10 @@ CCUSAGE_API_KEY=""
 
 # Report interval in minutes (1-1440, default: 5)
 REPORT_INTERVAL="5"
+
+# Skip SSL certificate verification (true/false, default: false)
+# Use this if your server uses a self-signed certificate or is behind Cloudflare
+CCUSAGE_INSECURE="false"
 
 # Claude projects directory (optional, default: ~/.claude/projects)
 # CLAUDE_PROJECTS_DIR=""

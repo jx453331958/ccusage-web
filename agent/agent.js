@@ -19,6 +19,13 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const https = require('https');
+
+// Version
+const VERSION = '1.1.0';
+
+// User agent string
+const USER_AGENT = `CCUsage-Agent/${VERSION} (Node.js)`;
 
 // Configuration file path
 const CONFIG_FILE = path.join(os.homedir(), '.ccusage-agent.conf');
@@ -66,12 +73,19 @@ function loadConfigFile() {
 // Load config from file first, then override with env vars
 const fileConfig = loadConfigFile();
 
+// Parse insecure flag from env or config
+function parseInsecure(value) {
+  if (!value) return false;
+  return ['true', '1', 'yes'].includes(String(value).toLowerCase());
+}
+
 // Configuration (priority: env vars > config file > defaults)
 const config = {
   server: process.env.CCUSAGE_SERVER || fileConfig.CCUSAGE_SERVER || 'http://localhost:3000',
   apiKey: process.env.CCUSAGE_API_KEY || fileConfig.CCUSAGE_API_KEY || '',
   claudeProjectsDir: process.env.CLAUDE_PROJECTS_DIR || fileConfig.CLAUDE_PROJECTS_DIR || path.join(os.homedir(), '.claude', 'projects'),
   reportIntervalMinutes: parseReportInterval(process.env.REPORT_INTERVAL || fileConfig.REPORT_INTERVAL, 5),
+  insecure: parseInsecure(process.env.CCUSAGE_INSECURE || fileConfig.CCUSAGE_INSECURE),
   stateFile: path.join(os.homedir(), '.ccusage-agent-state.json'),
   configFile: CONFIG_FILE,
 };
@@ -92,9 +106,11 @@ process.argv.slice(2).forEach((arg, i, args) => {
     config.reportInterval = config.reportIntervalMinutes * 60 * 1000;
   } else if (arg === '--once') {
     runOnce = true;
+  } else if (arg === '--insecure' || arg === '-k') {
+    config.insecure = true;
   } else if (arg === '--help') {
     console.log(`
-CCUsage Agent - Claude Code Usage Monitor
+CCUsage Agent v${VERSION} - Claude Code Usage Monitor
 
 Usage:
   node agent.js [options]
@@ -104,6 +120,7 @@ Options:
   --api-key KEY     API key for authentication
   --interval MIN    Report interval in minutes, 1-1440 (default: 5)
   --once            Run once and exit (for cron scheduling)
+  --insecure, -k    Skip SSL certificate verification (for self-signed certs)
   --help            Show this help message
 
 Configuration File:
@@ -117,6 +134,7 @@ Environment Variables:
   CCUSAGE_API_KEY       API key for authentication
   CLAUDE_PROJECTS_DIR   Claude projects directory
   REPORT_INTERVAL       Report interval in minutes, 1-1440 (default: 5)
+  CCUSAGE_INSECURE      Skip SSL certificate verification (true/false)
 
 Examples:
   # Run with 1-minute interval
@@ -124,6 +142,9 @@ Examples:
 
   # Run once (for cron)
   node agent.js --once
+
+  # Run with self-signed certificate (skip SSL verification)
+  node agent.js --server https://my-server.com --api-key KEY --insecure
     `);
     process.exit(0);
   }
@@ -307,6 +328,26 @@ function parseJsonlFile(filePath) {
   return records;
 }
 
+// Create fetch options with optional SSL bypass
+function createFetchOptions(options) {
+  const fetchOptions = { ...options };
+
+  // Add User-Agent header
+  fetchOptions.headers = {
+    ...fetchOptions.headers,
+    'User-Agent': USER_AGENT,
+  };
+
+  // If insecure mode, create a custom HTTPS agent that ignores certificate errors
+  if (config.insecure && config.server.startsWith('https://')) {
+    fetchOptions.agent = new https.Agent({
+      rejectUnauthorized: false,
+    });
+  }
+
+  return fetchOptions;
+}
+
 // Report usage to server
 async function reportUsage(records) {
   if (records.length === 0) {
@@ -315,7 +356,7 @@ async function reportUsage(records) {
   }
 
   try {
-    const response = await fetch(`${config.server}/api/usage/report`, {
+    const fetchOptions = createFetchOptions({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -332,6 +373,8 @@ async function reportUsage(records) {
         })),
       }),
     });
+
+    const response = await fetch(`${config.server}/api/usage/report`, fetchOptions);
 
     if (response.ok) {
       const data = await response.json();
@@ -355,10 +398,13 @@ async function reportUsage(records) {
 // Main monitoring loop
 async function run() {
   if (!runOnce) {
-    console.log('CCUsage Agent started');
+    console.log(`CCUsage Agent v${VERSION} started`);
     console.log(`Server: ${config.server}`);
     console.log(`Claude projects: ${config.claudeProjectsDir}`);
     console.log(`Report interval: ${config.reportIntervalMinutes} minute(s)`);
+    if (config.insecure) {
+      console.log('WARNING: SSL certificate verification is disabled');
+    }
     if (fs.existsSync(config.configFile)) {
       console.log(`Config file: ${config.configFile}`);
     }

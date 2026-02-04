@@ -23,10 +23,17 @@ import json
 import time
 import signal
 import argparse
+import ssl
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from typing import Dict, List, Set, Optional, Any
+
+# Version
+VERSION = '1.1.0'
+
+# User agent string
+USER_AGENT = f'CCUsage-Agent/{VERSION} (Python)'
 
 # Configuration file path
 CONFIG_FILE = Path.home() / '.ccusage-agent.conf'
@@ -69,6 +76,10 @@ def get_config() -> Dict[str, Any]:
     except ValueError:
         interval = 5
 
+    # Parse insecure flag
+    insecure_str = get_value('CCUSAGE_INSECURE', 'false').lower()
+    insecure = insecure_str in ('true', '1', 'yes')
+
     return {
         'server': get_value('CCUSAGE_SERVER', 'http://localhost:3000'),
         'api_key': get_value('CCUSAGE_API_KEY', ''),
@@ -77,6 +88,7 @@ def get_config() -> Dict[str, Any]:
             str(Path.home() / '.claude' / 'projects')
         )),
         'report_interval': interval,
+        'insecure': insecure,
         'state_file': STATE_FILE,
         'config_file': CONFIG_FILE,
     }
@@ -279,11 +291,19 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
             headers={
                 'Content-Type': 'application/json',
                 'Authorization': f"Bearer {config['api_key']}",
+                'User-Agent': USER_AGENT,
             },
             method='POST',
         )
 
-        with urlopen(request, timeout=30) as response:
+        # Create SSL context
+        ssl_context = None
+        if config.get('insecure'):
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+        with urlopen(request, timeout=30, context=ssl_context) as response:
             result = json.loads(response.read().decode('utf-8'))
             print(f"✓ Reported {result.get('inserted', len(records))} records successfully")
 
@@ -344,6 +364,7 @@ Environment Variables:
   CCUSAGE_API_KEY       API key for authentication
   CLAUDE_PROJECTS_DIR   Claude projects directory
   REPORT_INTERVAL       Report interval in minutes (1-1440)
+  CCUSAGE_INSECURE      Skip SSL certificate verification (true/false)
 
 Examples:
   # Run with 1-minute interval
@@ -351,12 +372,17 @@ Examples:
 
   # Run once (for cron)
   python3 agent.py --once
+
+  # Run with self-signed certificate (skip SSL verification)
+  python3 agent.py --server https://my-server.com --api-key KEY --insecure
         '''
     )
     parser.add_argument('--server', help='Server URL (default: http://localhost:3000)')
     parser.add_argument('--api-key', help='API key for authentication')
     parser.add_argument('--interval', type=int, help='Report interval in minutes (1-1440)')
     parser.add_argument('--once', action='store_true', help='Run once and exit')
+    parser.add_argument('--insecure', '-k', action='store_true',
+                        help='Skip SSL certificate verification (for self-signed certs)')
 
     args = parser.parse_args()
 
@@ -371,6 +397,8 @@ Examples:
     if args.interval:
         if 1 <= args.interval <= 1440:
             config['report_interval'] = args.interval
+    if args.insecure:
+        config['insecure'] = True
 
     # Validate API key
     if not config['api_key']:
@@ -380,10 +408,12 @@ Examples:
     state = State(config['state_file'])
 
     if not args.once:
-        print('CCUsage Agent started')
+        print(f'CCUsage Agent v{VERSION} started')
         print(f"Server: {config['server']}")
         print(f"Claude projects: {config['claude_projects_dir']}")
         print(f"Report interval: {config['report_interval']} minute(s)")
+        if config.get('insecure'):
+            print('WARNING: SSL certificate verification is disabled')
         if config['config_file'].exists():
             print(f"Config file: {config['config_file']}")
         print('---')
