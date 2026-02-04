@@ -71,14 +71,47 @@ EOF
 prompt_config() {
     load_config
 
+    # Check if we already have config from environment or file
+    if [[ -n "$CCUSAGE_SERVER" ]] && [[ -n "$CCUSAGE_API_KEY" ]]; then
+        log_info "Using existing configuration"
+        log_info "Server: $CCUSAGE_SERVER"
+        save_config
+        return
+    fi
+
+    # Try to get interactive input
+    local can_prompt=false
+    if [[ -t 0 ]]; then
+        can_prompt=true
+    elif [[ -e /dev/tty ]]; then
+        # Try to open /dev/tty
+        if exec 3</dev/tty 2>/dev/null; then
+            exec 0<&3
+            can_prompt=true
+        fi
+    fi
+
+    if [[ "$can_prompt" == "false" ]]; then
+        echo ""
+        log_error "Cannot read input in pipe mode."
+        echo ""
+        echo "Please use one of these methods instead:"
+        echo ""
+        echo "  Method 1: Set environment variables"
+        echo "    CCUSAGE_SERVER=http://your-server:3000 CCUSAGE_API_KEY=your-key \\"
+        echo "      curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install"
+        echo ""
+        echo "  Method 2: Download and run"
+        echo "    curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh"
+        echo "    chmod +x setup.sh"
+        echo "    ./setup.sh install"
+        echo ""
+        exit 1
+    fi
+
     echo ""
     echo "=== CCUsage Agent Configuration ==="
     echo ""
-
-    # Read from /dev/tty to support curl | bash execution
-    if [[ ! -t 0 ]] && [[ -e /dev/tty ]]; then
-        exec < /dev/tty
-    fi
 
     printf "Server URL [%s]: " "$CCUSAGE_SERVER"
     read -r input_server || true
