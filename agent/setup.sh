@@ -6,10 +6,17 @@ set -e
 
 # Installation directory
 INSTALL_DIR="$HOME/.ccusage-agent"
-AGENT_SCRIPT="$INSTALL_DIR/agent.js"
 CONFIG_FILE="$HOME/.ccusage-agent.conf"
 SERVICE_NAME="ccusage-agent"
-AGENT_URL="https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/agent.js"
+
+# Agent URLs
+AGENT_PY_URL="https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/agent.py"
+AGENT_JS_URL="https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/agent.js"
+
+# Will be set by detect_runtime
+AGENT_SCRIPT=""
+AGENT_RUNTIME=""
+RUNTIME_PATH=""
 
 # Colors
 RED='\033[0;31m'
@@ -29,29 +36,54 @@ detect_os() {
     esac
 }
 
+detect_runtime() {
+    # Prefer Python 3 over Node.js
+    if command -v python3 &> /dev/null; then
+        AGENT_RUNTIME="python"
+        RUNTIME_PATH=$(which python3)
+        AGENT_SCRIPT="$INSTALL_DIR/agent.py"
+        log_info "Using Python: $($RUNTIME_PATH --version)"
+        return 0
+    elif command -v node &> /dev/null; then
+        AGENT_RUNTIME="node"
+        RUNTIME_PATH=$(which node)
+        AGENT_SCRIPT="$INSTALL_DIR/agent.js"
+        log_info "Using Node.js: $(node --version)"
+        return 0
+    else
+        log_error "Neither Python 3 nor Node.js is installed."
+        log_error "Please install Python 3 (recommended) or Node.js."
+        exit 1
+    fi
+}
+
 download_agent() {
     mkdir -p "$INSTALL_DIR"
 
-    log_info "Downloading agent.js..."
-    if command -v curl &> /dev/null; then
-        curl -sL "$AGENT_URL" -o "$AGENT_SCRIPT"
-    elif command -v wget &> /dev/null; then
-        wget -q "$AGENT_URL" -O "$AGENT_SCRIPT"
+    if [[ "$AGENT_RUNTIME" == "python" ]]; then
+        log_info "Downloading agent.py..."
+        if command -v curl &> /dev/null; then
+            curl -sL "$AGENT_PY_URL" -o "$AGENT_SCRIPT"
+        elif command -v wget &> /dev/null; then
+            wget -q "$AGENT_PY_URL" -O "$AGENT_SCRIPT"
+        else
+            log_error "curl or wget is required"
+            exit 1
+        fi
     else
-        log_error "curl or wget is required"
-        exit 1
+        log_info "Downloading agent.js..."
+        if command -v curl &> /dev/null; then
+            curl -sL "$AGENT_JS_URL" -o "$AGENT_SCRIPT"
+        elif command -v wget &> /dev/null; then
+            wget -q "$AGENT_JS_URL" -O "$AGENT_SCRIPT"
+        else
+            log_error "curl or wget is required"
+            exit 1
+        fi
     fi
 
     chmod +x "$AGENT_SCRIPT"
     log_info "Agent installed to $AGENT_SCRIPT"
-}
-
-check_node() {
-    if ! command -v node &> /dev/null; then
-        log_error "Node.js is not installed. Please install Node.js first."
-        exit 1
-    fi
-    log_info "Node.js found: $(node --version)"
 }
 
 load_config() {
@@ -176,7 +208,6 @@ prompt_config() {
 # macOS launchd setup
 install_macos() {
     local plist_path="$HOME/Library/LaunchAgents/com.ccusage.agent.plist"
-    local node_path=$(which node)
 
     cat > "$plist_path" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -187,7 +218,7 @@ install_macos() {
     <string>com.ccusage.agent</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$node_path</string>
+        <string>$RUNTIME_PATH</string>
         <string>$AGENT_SCRIPT</string>
     </array>
     <key>EnvironmentVariables</key>
@@ -260,7 +291,6 @@ restart_macos() {
 # Linux systemd setup
 install_linux() {
     local service_path="$HOME/.config/systemd/user/$SERVICE_NAME.service"
-    local node_path=$(which node)
 
     mkdir -p "$(dirname "$service_path")"
 
@@ -274,7 +304,7 @@ Type=simple
 Environment="CCUSAGE_SERVER=$CCUSAGE_SERVER"
 Environment="CCUSAGE_API_KEY=$CCUSAGE_API_KEY"
 Environment="REPORT_INTERVAL=$REPORT_INTERVAL"
-ExecStart=$node_path $AGENT_SCRIPT
+ExecStart=$RUNTIME_PATH $AGENT_SCRIPT
 Restart=always
 RestartSec=60
 
@@ -347,7 +377,7 @@ install_cron() {
         fi
     fi
 
-    local cron_cmd="$cron_schedule CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" $(which node) $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
+    local cron_cmd="$cron_schedule CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" $RUNTIME_PATH $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
 
     # Remove existing entry and add new one
     (crontab -l 2>/dev/null | grep -v "ccusage-agent\|$AGENT_SCRIPT"; echo "$cron_cmd") | crontab -
@@ -378,7 +408,7 @@ restart_cron() {
 
 # Main commands
 cmd_install() {
-    check_node
+    detect_runtime
     download_agent
     prompt_config
 
@@ -453,7 +483,7 @@ cmd_status() {
 }
 
 cmd_run() {
-    check_node
+    detect_runtime
 
     if [[ ! -f "$AGENT_SCRIPT" ]]; then
         download_agent
@@ -466,7 +496,7 @@ cmd_run() {
     fi
 
     log_info "Running agent once..."
-    CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" node "$AGENT_SCRIPT" --once
+    CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once
 }
 
 cmd_restart() {
@@ -490,6 +520,7 @@ cmd_restart() {
 }
 
 cmd_update() {
+    detect_runtime
     log_info "Updating agent..."
     download_agent
     log_info "Update complete."

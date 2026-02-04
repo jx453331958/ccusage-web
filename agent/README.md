@@ -2,6 +2,14 @@
 
 A lightweight monitoring agent that collects Claude Code usage data and reports it to the CCUsage Web server.
 
+**Supports both Python 3 and Node.js** - The setup script automatically detects and uses Python 3 (preferred) or Node.js.
+
+## Requirements
+
+One of the following:
+- **Python 3.6+** (recommended, uses only standard library)
+- Node.js 18+
+
 ## Quick Setup
 
 Run the setup script for automatic installation:
@@ -11,10 +19,11 @@ Run the setup script for automatic installation:
 ```
 
 This will:
-1. Prompt for your server URL and API key
-2. Prompt for report interval (1-1440 minutes, default: 5)
-3. Detect your OS (macOS/Linux)
-4. Install as a background service (launchd/systemd/cron)
+1. Auto-detect runtime (Python 3 preferred, falls back to Node.js)
+2. Prompt for your server URL and API key
+3. Prompt for report interval (1-1440 minutes, default: 5)
+4. Detect your OS (macOS/Linux)
+5. Install as a background service (launchd/systemd/cron)
 
 Other commands:
 ```bash
