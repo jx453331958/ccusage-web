@@ -125,13 +125,20 @@ npm run dev
    - 服务器地址（例如：`http://your-server:3000`）
    - API 密钥（在仪表板 → API Keys 标签页创建）
 
-2. **一键安装：**
+2. **一键安装（通过环境变量）：**
 ```bash
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | \
+  CCUSAGE_SERVER=http://your-server:3000 CCUSAGE_API_KEY=your-key bash -s install
+```
+
+或者 **下载后交互式运行：**
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
+chmod +x setup.sh
+./setup.sh install
 ```
 
 脚本会：
-- 提示输入服务器地址和 API 密钥
 - 自动检测操作系统（macOS/Linux）
 - 安装为后台服务（launchd/systemd/cron）
 - 开始每 5 分钟上报一次使用数据

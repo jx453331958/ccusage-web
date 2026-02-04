@@ -125,13 +125,20 @@ After the server is running, users can install the monitoring agent:
    - Server URL (e.g., `http://your-server:3000`)
    - API Key (create in dashboard → API Keys tab)
 
-2. **One-line installation:**
+2. **One-line installation (with environment variables):**
 ```bash
-curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | bash -s install
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | \
+  CCUSAGE_SERVER=http://your-server:3000 CCUSAGE_API_KEY=your-key bash -s install
+```
+
+Or **download and run interactively:**
+```bash
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh -o setup.sh
+chmod +x setup.sh
+./setup.sh install
 ```
 
 The script will:
-- Prompt for server URL and API key
 - Auto-detect OS (macOS/Linux)
 - Install as background service (launchd/systemd/cron)
 - Start reporting usage every 5 minutes
