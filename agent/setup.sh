@@ -70,27 +70,30 @@ EOF
 
 prompt_config() {
     load_config
-    
+
     echo ""
     echo "=== CCUsage Agent Configuration ==="
     echo ""
-    
-    read -p "Server URL [$CCUSAGE_SERVER]: " input_server
+
+    # Read from /dev/tty to support curl | bash execution
+    printf "Server URL [$CCUSAGE_SERVER]: "
+    read input_server < /dev/tty
     CCUSAGE_SERVER="${input_server:-$CCUSAGE_SERVER}"
-    
+
     if [[ -z "$CCUSAGE_SERVER" ]]; then
         log_error "Server URL is required"
         exit 1
     fi
-    
-    read -p "API Key [$CCUSAGE_API_KEY]: " input_key
+
+    printf "API Key [$CCUSAGE_API_KEY]: "
+    read input_key < /dev/tty
     CCUSAGE_API_KEY="${input_key:-$CCUSAGE_API_KEY}"
-    
+
     if [[ -z "$CCUSAGE_API_KEY" ]]; then
         log_error "API Key is required"
         exit 1
     fi
-    
+
     save_config
     log_info "Configuration saved to $CONFIG_FILE"
 }
