@@ -29,7 +29,7 @@ function buildTrendQuery(interval: Interval): string {
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens
     FROM usage_records
-    WHERE timestamp >= ?
+    WHERE timestamp >= ? AND timestamp <= ?
     GROUP BY (timestamp / ${intervalSeconds})
     ORDER BY timestamp ASC
   `;
@@ -48,7 +48,7 @@ function buildModelTrendQuery(interval: Interval): string {
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens
     FROM usage_records
-    WHERE timestamp >= ?
+    WHERE timestamp >= ? AND timestamp <= ?
     GROUP BY (timestamp / ${intervalSeconds}), model
     ORDER BY timestamp ASC, model ASC
   `;
@@ -61,24 +61,47 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const range = searchParams.get('range') || '7d';
+  const range = searchParams.get('range') || 'today';
   const interval = (searchParams.get('interval') || 'auto') as Interval | 'auto';
+  const fromParam = searchParams.get('from');
+  const toParam = searchParams.get('to');
 
   // Calculate timestamp range
   const now = Math.floor(Date.now() / 1000);
-  let startTime = now - 7 * 24 * 60 * 60; // default 7 days
+  let startTime: number;
+  let endTime: number = now;
 
-  if (range === '1d') startTime = now - 24 * 60 * 60;
-  else if (range === '7d') startTime = now - 7 * 24 * 60 * 60;
-  else if (range === '30d') startTime = now - 30 * 24 * 60 * 60;
-  else if (range === 'all') startTime = 0;
+  if (fromParam && toParam) {
+    // Custom date range
+    startTime = parseInt(fromParam, 10);
+    endTime = parseInt(toParam, 10);
+  } else if (range === 'today') {
+    // Today: from midnight local time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    startTime = Math.floor(today.getTime() / 1000);
+  } else if (range === '7d') {
+    startTime = now - 7 * 24 * 60 * 60;
+  } else if (range === '30d') {
+    startTime = now - 30 * 24 * 60 * 60;
+  } else if (range === 'all') {
+    startTime = 0;
+  } else {
+    // Default to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    startTime = Math.floor(today.getTime() / 1000);
+  }
+
+  // Calculate date range span to determine auto interval
+  const rangeSpanDays = (endTime - startTime) / (24 * 60 * 60);
 
   // Determine granularity based on interval or auto-select based on range
   let effectiveInterval: Interval;
   if (interval === 'auto') {
-    // Auto-select reasonable interval based on range
-    if (range === '1d') effectiveInterval = '1h';
-    else if (range === '7d') effectiveInterval = '1d';
+    // Auto-select reasonable interval based on date span
+    if (rangeSpanDays <= 1) effectiveInterval = '1h';
+    else if (rangeSpanDays <= 7) effectiveInterval = '1d';
     else effectiveInterval = '1d';
   } else {
     effectiveInterval = interval;
@@ -95,8 +118,8 @@ export async function GET(request: NextRequest) {
       SUM(total_tokens) as total_tokens,
       COUNT(*) as total_records
     FROM usage_records
-    WHERE timestamp >= ?
-  `).get(startTime) as { total_input: number; total_output: number; total_tokens: number; total_records: number };
+    WHERE timestamp >= ? AND timestamp <= ?
+  `).get(startTime, endTime) as { total_input: number; total_output: number; total_tokens: number; total_records: number };
 
   // Get per-device stats
   const deviceStats = db.prepare(`
@@ -108,18 +131,18 @@ export async function GET(request: NextRequest) {
       COUNT(*) as record_count,
       MAX(timestamp) as last_report
     FROM usage_records
-    WHERE timestamp >= ?
+    WHERE timestamp >= ? AND timestamp <= ?
     GROUP BY device_name
     ORDER BY total_tokens DESC
-  `).all(startTime);
+  `).all(startTime, endTime);
 
   // Get trend data with selected interval
   const trendQuery = buildTrendQuery(effectiveInterval);
-  const trendData = db.prepare(trendQuery).all(startTime);
+  const trendData = db.prepare(trendQuery).all(startTime, endTime);
 
   // Get model trend data (for per-model charts)
   const modelTrendQuery = buildModelTrendQuery(effectiveInterval);
-  const modelTrendRaw = db.prepare(modelTrendQuery).all(startTime) as {
+  const modelTrendRaw = db.prepare(modelTrendQuery).all(startTime, endTime) as {
     timestamp: number;
     model: string;
     input_tokens: number;
@@ -136,10 +159,10 @@ export async function GET(request: NextRequest) {
       SUM(total_tokens) as total_tokens,
       COUNT(*) as record_count
     FROM usage_records
-    WHERE timestamp >= ?
+    WHERE timestamp >= ? AND timestamp <= ?
     GROUP BY model
     ORDER BY total_tokens DESC
-  `).all(startTime) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
+  `).all(startTime, endTime) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
 
   return NextResponse.json({
     totalStats: {
