@@ -76,8 +76,12 @@ prompt_config() {
     echo ""
 
     # Read from /dev/tty to support curl | bash execution
-    printf "Server URL [$CCUSAGE_SERVER]: "
-    read input_server < /dev/tty
+    if [[ ! -t 0 ]] && [[ -e /dev/tty ]]; then
+        exec < /dev/tty
+    fi
+
+    printf "Server URL [%s]: " "$CCUSAGE_SERVER"
+    read -r input_server || true
     CCUSAGE_SERVER="${input_server:-$CCUSAGE_SERVER}"
 
     if [[ -z "$CCUSAGE_SERVER" ]]; then
@@ -85,8 +89,8 @@ prompt_config() {
         exit 1
     fi
 
-    printf "API Key [$CCUSAGE_API_KEY]: "
-    read input_key < /dev/tty
+    printf "API Key [%s]: " "${CCUSAGE_API_KEY:+****}"
+    read -r input_key || true
     CCUSAGE_API_KEY="${input_key:-$CCUSAGE_API_KEY}"
 
     if [[ -z "$CCUSAGE_API_KEY" ]]; then
