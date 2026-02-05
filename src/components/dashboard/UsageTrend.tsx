@@ -326,6 +326,7 @@ export default function UsageTrend({
             )}
             <ReactECharts
               option={chartOption}
+              notMerge={true}
               style={{ height: '400px', width: '100%' }}
               opts={{ renderer: 'svg' }}
             />
