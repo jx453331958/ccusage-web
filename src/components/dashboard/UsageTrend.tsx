@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import type { Interval } from './DashboardClient';
 
 // Dynamic import to avoid SSR issues with ECharts
@@ -82,6 +84,7 @@ export default function UsageTrend({
 }: UsageTrendProps) {
   const t = useTranslations('dashboard.usageTrend');
   const [viewMode, setViewMode] = useState<ViewMode>('total');
+  const [showZeroValues, setShowZeroValues] = useState(false);
 
   // Get unique models
   const models = useMemo(() => {
@@ -94,7 +97,11 @@ export default function UsageTrend({
 
   // Build chart options for total view
   const totalChartOption = useMemo(() => {
-    const timestamps = trendData.map((d) => d.timestamp);
+    // Filter out zero values if showZeroValues is false
+    const filteredData = showZeroValues
+      ? trendData
+      : trendData.filter((d) => d.input_tokens > 0 || d.output_tokens > 0 || d.total_tokens > 0);
+    const timestamps = filteredData.map((d) => d.timestamp);
 
     return {
       tooltip: {
@@ -152,34 +159,34 @@ export default function UsageTrend({
         {
           name: t('inputTokens'),
           type: 'line',
-          data: trendData.map((d) => d.input_tokens),
+          data: filteredData.map((d) => d.input_tokens),
           smooth: true,
           itemStyle: { color: '#3b82f6' },
         },
         {
           name: t('outputTokens'),
           type: 'line',
-          data: trendData.map((d) => d.output_tokens),
+          data: filteredData.map((d) => d.output_tokens),
           smooth: true,
           itemStyle: { color: '#10b981' },
         },
         {
           name: t('totalTokens'),
           type: 'line',
-          data: trendData.map((d) => d.total_tokens),
+          data: filteredData.map((d) => d.total_tokens),
           smooth: true,
           itemStyle: { color: '#8b5cf6' },
         },
       ],
     };
-  }, [trendData, effectiveInterval, t]);
+  }, [trendData, effectiveInterval, t, showZeroValues]);
 
   // Build chart options for model view
   const modelChartOption = useMemo(() => {
     // Get all unique timestamps
     const timestampSet = new Set<number>();
     modelTrendData.forEach((d) => timestampSet.add(d.timestamp));
-    const timestamps = Array.from(timestampSet).sort((a, b) => a - b);
+    const allTimestamps = Array.from(timestampSet).sort((a, b) => a - b);
 
     // Build data map: model -> timestamp -> total_tokens
     const modelDataMap = new Map<string, Map<number, number>>();
@@ -191,6 +198,16 @@ export default function UsageTrend({
         modelDataMap.get(d.model)!.set(d.timestamp, d.total_tokens);
       }
     });
+
+    // Filter out timestamps where all models have zero values
+    const timestamps = showZeroValues
+      ? allTimestamps
+      : allTimestamps.filter((ts) => {
+          return models.some((model) => {
+            const value = modelDataMap.get(model)?.get(ts) || 0;
+            return value > 0;
+          });
+        });
 
     // Build series
     const series = models.map((model, index) => {
@@ -263,7 +280,7 @@ export default function UsageTrend({
       ],
       series,
     };
-  }, [modelTrendData, models, effectiveInterval, t]);
+  }, [modelTrendData, models, effectiveInterval, t, showZeroValues]);
 
   const chartOption = viewMode === 'total' ? totalChartOption : modelChartOption;
 
@@ -278,21 +295,33 @@ export default function UsageTrend({
                 {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={viewMode === 'total' ? 'default' : 'outline'}
-                onClick={() => setViewMode('total')}
-              >
-                {t('viewTotal')}
-              </Button>
-              <Button
-                size="sm"
-                variant={viewMode === 'model' ? 'default' : 'outline'}
-                onClick={() => setViewMode('model')}
-              >
-                {t('viewByModel')}
-              </Button>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'total' ? 'default' : 'outline'}
+                  onClick={() => setViewMode('total')}
+                >
+                  {t('viewTotal')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'model' ? 'default' : 'outline'}
+                  onClick={() => setViewMode('model')}
+                >
+                  {t('viewByModel')}
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-zero"
+                  checked={showZeroValues}
+                  onCheckedChange={setShowZeroValues}
+                />
+                <Label htmlFor="show-zero" className="text-sm cursor-pointer">
+                  {t('showZeroValues')}
+                </Label>
+              </div>
             </div>
           </div>
           <div className="space-y-2">

@@ -78,6 +78,7 @@
       "viewTotal": "Total",
       "viewByModel": "By Model",
       "unknownModel": "Unknown",
+      "showZeroValues": "Show zero values",
       "zoomHint": "Drag the slider below to zoom, or scroll in the chart area",
       "interval": {
         "auto": "Auto",

@@ -78,6 +78,7 @@
       "viewTotal": "总量",
       "viewByModel": "按模型",
       "unknownModel": "未知",
+      "showZeroValues": "显示零值",
       "zoomHint": "拖动下方滑块缩放，或在图表区域滚动",
       "interval": {
         "auto": "自动",
