@@ -82,7 +82,6 @@ nano .env  # 编辑配置
 
 推荐的 `.env` 配置：
 ```bash
-JWT_SECRET=你的随机密钥-请修改
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=你的安全密码
 COOKIE_SECURE=false  # 如果使用 HTTPS 请设为 true
@@ -307,7 +306,6 @@ Cookie: auth_token=JWT_TOKEN
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `DATABASE_PATH` | SQLite 数据库路径 | `./data/ccusage.db` |
-| `JWT_SECRET` | JWT 签名密钥 | 生产环境必需 |
 | `ADMIN_USERNAME` | 默认管理员用户名 | `admin` |
 | `ADMIN_PASSWORD` | 默认管理员密码 | `admin123` |
 | `COOKIE_SECURE` | 启用安全 Cookie (HTTPS) | `false` |

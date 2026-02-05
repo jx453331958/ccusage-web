@@ -82,7 +82,6 @@ nano .env  # Edit with your settings
 
 Recommended `.env` settings:
 ```bash
-JWT_SECRET=your-random-secret-key-change-this
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-secure-password
 COOKIE_SECURE=false  # Set to true if using HTTPS
@@ -307,7 +306,6 @@ Cookie: auth_token=JWT_TOKEN
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_PATH` | Path to SQLite database | `./data/ccusage.db` |
-| `JWT_SECRET` | Secret key for JWT signing | Required in production |
 | `ADMIN_USERNAME` | Default admin username | `admin` |
 | `ADMIN_PASSWORD` | Default admin password | `admin123` |
 | `COOKIE_SECURE` | Enable secure cookies (HTTPS) | `false` |

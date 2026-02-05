@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 const DB_PATH = process.env.DATABASE_PATH || './data/ccusage.db';
@@ -74,6 +75,21 @@ function initializeDatabase() {
     database.exec(`ALTER TABLE usage_records ADD COLUMN model TEXT DEFAULT 'unknown'`);
   }
 
+  // Settings table (for auto-generated secrets, etc.)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )
+  `);
+
+  // Auto-generate JWT secret if not exists
+  const jwtSecret = database.prepare('SELECT value FROM settings WHERE key = ?').get('jwt_secret') as { value: string } | undefined;
+  if (!jwtSecret) {
+    const secret = crypto.randomBytes(64).toString('hex');
+    database.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('jwt_secret', secret);
+  }
+
   // Create indices for better query performance
   database.exec(`
     CREATE INDEX IF NOT EXISTS idx_usage_timestamp ON usage_records(timestamp);
@@ -93,6 +109,12 @@ function initializeDatabase() {
     database.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run(username, passwordHash);
     console.log(`Default admin user created: ${username}`);
   }
+}
+
+export function getJwtSecret(): string {
+  const database = getDatabase();
+  const row = database.prepare('SELECT value FROM settings WHERE key = ?').get('jwt_secret') as { value: string };
+  return row.value;
 }
 
 export default getDatabase;

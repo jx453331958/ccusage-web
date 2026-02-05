@@ -1,9 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
-import getDb, { type User } from './db';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+import getDb, { getJwtSecret, type User } from './db';
 
 export interface JWTPayload {
   userId: number;
@@ -13,14 +11,14 @@ export interface JWTPayload {
 export function generateToken(user: User): string {
   return jwt.sign(
     { userId: user.id, username: user.username } as JWTPayload,
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '7d' }
   );
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, getJwtSecret()) as JWTPayload;
   } catch {
     return null;
   }
