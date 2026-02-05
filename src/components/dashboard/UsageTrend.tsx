@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 import type { Interval } from './DashboardClient';
 
 // Dynamic import to avoid SSR issues with ECharts
@@ -349,8 +350,11 @@ export default function UsageTrend({
         ) : (
           <div className="w-full relative">
             {loading && (
-              <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center">
-                <div className="text-sm text-gray-500">Loading...</div>
+              <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center backdrop-blur-[1px] transition-opacity duration-200">
+                <div className="flex items-center gap-2 text-gray-600 bg-white/90 px-4 py-2 rounded-full shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm font-medium">{t('loading')}</span>
+                </div>
               </div>
             )}
             <ReactECharts

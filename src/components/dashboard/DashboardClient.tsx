@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { LogOut, Activity, Settings, CalendarIcon, BarChart3, Cpu, Key, Monitor, ChevronDown } from 'lucide-react';
+import { LogOut, Activity, Settings, CalendarIcon, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2 } from 'lucide-react';
 import StatsOverview from './StatsOverview';
 import DeviceList from './DeviceList';
 import ApiKeyManager from './ApiKeyManager';
@@ -34,6 +34,7 @@ export default function DashboardClient({ user }: { user: User }) {
   const [customDateRange, setCustomDateRange] = useState<{ from: Date; to: Date } | null>(null);
   const [interval, setInterval] = useState<Interval>('auto');
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false); // Loading state for data switching
   const [chartLoading, setChartLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
@@ -103,9 +104,11 @@ export default function DashboardClient({ user }: { user: User }) {
 
   // Full fetch - shows loading state, updates all data
   const fetchStats = useCallback(async () => {
-    // Only show full loading on initial load
+    // Show full loading on initial load, dataLoading on subsequent loads
     if (isInitialLoad.current) {
       setLoading(true);
+    } else {
+      setDataLoading(true);
     }
     try {
       const res = await fetch(buildStatsUrl());
@@ -117,6 +120,7 @@ export default function DashboardClient({ user }: { user: User }) {
       console.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
+      setDataLoading(false);
       isInitialLoad.current = false;
     }
   }, [buildStatsUrl]);
@@ -351,20 +355,34 @@ export default function DashboardClient({ user }: { user: User }) {
 
             {loading ? (
               <div className="text-center py-12">
-                <div className="text-gray-500">{t('common.loading')}</div>
+                <div className="flex items-center justify-center gap-2 text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>{t('common.loading')}</span>
+                </div>
               </div>
             ) : stats ? (
-              <>
-                <StatsOverview stats={stats.totalStats} />
-                <UsageTrend
-                  trendData={stats.trendData}
-                  modelTrendData={stats.modelTrendData || []}
-                  interval={interval}
-                  effectiveInterval={stats.interval}
-                  onIntervalChange={handleIntervalChange}
-                  loading={chartLoading}
-                />
-              </>
+              <div className="relative">
+                {/* Data loading overlay */}
+                {dataLoading && (
+                  <div className="absolute inset-0 bg-white/70 z-20 flex items-center justify-center rounded-lg backdrop-blur-[1px] transition-opacity duration-200">
+                    <div className="flex items-center gap-2 text-gray-600 bg-white/90 px-4 py-2 rounded-full shadow-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm font-medium">{t('common.loading')}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-6">
+                  <StatsOverview stats={stats.totalStats} />
+                  <UsageTrend
+                    trendData={stats.trendData}
+                    modelTrendData={stats.modelTrendData || []}
+                    interval={interval}
+                    effectiveInterval={stats.interval}
+                    onIntervalChange={handleIntervalChange}
+                    loading={chartLoading}
+                  />
+                </div>
+              </div>
             ) : null}
           </div>
         )}
@@ -374,10 +392,23 @@ export default function DashboardClient({ user }: { user: User }) {
           <div>
             {loading ? (
               <div className="text-center py-12">
-                <div className="text-gray-500">{t('common.loading')}</div>
+                <div className="flex items-center justify-center gap-2 text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>{t('common.loading')}</span>
+                </div>
               </div>
             ) : stats ? (
-              <DeviceList devices={stats.deviceStats} />
+              <div className="relative">
+                {dataLoading && (
+                  <div className="absolute inset-0 bg-white/70 z-20 flex items-center justify-center rounded-lg backdrop-blur-[1px] transition-opacity duration-200">
+                    <div className="flex items-center gap-2 text-gray-600 bg-white/90 px-4 py-2 rounded-full shadow-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm font-medium">{t('common.loading')}</span>
+                    </div>
+                  </div>
+                )}
+                <DeviceList devices={stats.deviceStats} />
+              </div>
             ) : null}
           </div>
         )}

@@ -69,6 +69,7 @@
     "usageTrend": {
       "title": "Usage Trend",
       "description": "Token usage over time",
+      "loading": "Updating chart...",
       "noData": "No data available for the selected period",
       "inputTokens": "Input Tokens",
       "outputTokens": "Output Tokens",
