@@ -120,21 +120,4 @@
   .ant-picker-dropdown .ant-picker-panels {
     flex-direction: column !important;
   }
-  .ant-picker-dropdown .ant-picker-presets {
-    max-width: none !important;
-    width: 100% !important;
-    max-height: none !important;
-    border-inline-end: none !important;
-    border-bottom: 1px solid rgba(5, 5, 5, 0.06) !important;
-    padding: 8px !important;
-  }
-  .ant-picker-dropdown .ant-picker-presets ul {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 4px !important;
-    height: auto !important;
-  }
-  .ant-picker-dropdown .ant-picker-presets li {
-    margin: 0 !important;
-  }
 }

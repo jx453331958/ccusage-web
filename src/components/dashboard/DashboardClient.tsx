@@ -60,6 +60,8 @@ export default function DashboardClient({ user }: { user: User }) {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState(false);
+  const [activePresetKey, setActivePresetKey] = useState<string | null>('today');
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
 
@@ -159,14 +161,26 @@ export default function DashboardClient({ user }: { user: User }) {
     router.refresh();
   };
 
+  const datePresets = useMemo(() => buildDatePresets(), []);
+
   const rangePresets = useMemo(() =>
-    buildDatePresets().map(preset => ({
+    datePresets.map(preset => ({
       label: preset.key === 'today'
         ? t('dashboard.timeRange.today')
         : t(`dashboard.timeRange.presets.${preset.key}`),
       value: [preset.from, preset.to] as [dayjs.Dayjs, dayjs.Dayjs],
     })),
-  [t]);
+  [datePresets, t]);
+
+  const findMatchingPresetKey = useCallback((from: dayjs.Dayjs, to: dayjs.Dayjs): string | null => {
+    const presets = buildDatePresets();
+    for (const preset of presets) {
+      if (from.isSame(preset.from, 'day') && to.isSame(preset.to, 'day')) {
+        return preset.key;
+      }
+    }
+    return null;
+  }, []);
 
   const tabs: { id: TabType; icon: React.ReactNode; label: string }[] = [
     { id: 'overview', icon: <BarChart3 className="h-4 w-4" />, label: t('dashboard.tabs.overview') },
@@ -296,15 +310,19 @@ export default function DashboardClient({ user }: { user: User }) {
               {/* Divider - desktop only */}
               <div className="h-6 w-px bg-gray-200 hidden sm:block" />
 
-              {/* Date Range Picker */}
-              <div className="w-full sm:w-auto">
+              {/* Date Range Picker - Desktop */}
+              <div className="hidden sm:block sm:w-auto">
                 <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
                   <DatePicker.RangePicker
                     presets={rangePresets}
                     value={dateRange}
                     onChange={(dates) => {
                       if (dates && dates[0] && dates[1]) {
-                        setDateRange([dates[0].startOf('day'), dates[1].startOf('day')]);
+                        const from = dates[0].startOf('day');
+                        const to = dates[1].startOf('day');
+                        setDateRange([from, to]);
+                        setActivePresetKey(findMatchingPresetKey(from, to));
+                        setShowCustomPicker(false);
                       }
                     }}
                     disabledDate={(current) => current.isAfter(dayjs(), 'day')}
@@ -312,6 +330,62 @@ export default function DashboardClient({ user }: { user: User }) {
                     style={{ width: '100%' }}
                   />
                 </ConfigProvider>
+              </div>
+
+              {/* Date Preset Chips - Mobile */}
+              <div className="sm:hidden w-full space-y-2">
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4">
+                  {datePresets.map((preset) => (
+                    <Button
+                      key={preset.key}
+                      size="sm"
+                      variant={activePresetKey === preset.key ? 'default' : 'outline'}
+                      onClick={() => {
+                        setDateRange([preset.from, preset.to]);
+                        setActivePresetKey(preset.key);
+                        setShowCustomPicker(false);
+                      }}
+                      className="shrink-0 h-7 px-2.5 text-xs"
+                    >
+                      {preset.key === 'today'
+                        ? t('dashboard.timeRange.today')
+                        : t(`dashboard.timeRange.presets.${preset.key}`)}
+                    </Button>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant={activePresetKey === null ? 'default' : 'outline'}
+                    onClick={() => {
+                      setActivePresetKey(null);
+                      setShowCustomPicker(true);
+                    }}
+                    className="shrink-0 h-7 px-2.5 text-xs"
+                  >
+                    {t('dashboard.timeRange.custom')}
+                  </Button>
+                </div>
+                {showCustomPicker && (
+                  <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
+                    <DatePicker.RangePicker
+                      value={dateRange}
+                      onChange={(dates) => {
+                        if (dates && dates[0] && dates[1]) {
+                          const from = dates[0].startOf('day');
+                          const to = dates[1].startOf('day');
+                          setDateRange([from, to]);
+                          const matched = findMatchingPresetKey(from, to);
+                          if (matched) {
+                            setActivePresetKey(matched);
+                            setShowCustomPicker(false);
+                          }
+                        }
+                      }}
+                      disabledDate={(current) => current.isAfter(dayjs(), 'day')}
+                      allowClear={false}
+                      style={{ width: '100%' }}
+                    />
+                  </ConfigProvider>
+                )}
               </div>
             </div>
 
