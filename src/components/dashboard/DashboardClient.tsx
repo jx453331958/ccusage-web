@@ -4,9 +4,12 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { DatePicker, ConfigProvider } from 'antd';
 import antdZhCN from 'antd/locale/zh_CN';
 import 'dayjs/locale/zh-cn';
+
+dayjs.extend(isoWeek);
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LogOut, Activity, Settings, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2 } from 'lucide-react';
@@ -24,17 +27,20 @@ interface User {
 
 export type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d' | 'auto';
 
-const DATE_PRESETS = [
-  { key: 'today', fromDaysAgo: 0, toDaysAgo: 0 },
-  { key: 'yesterday', fromDaysAgo: 1, toDaysAgo: 1 },
-  { key: 'last3days', fromDaysAgo: 2, toDaysAgo: 0 },
-  { key: 'last7days', fromDaysAgo: 6, toDaysAgo: 0 },
-  { key: 'last2weeks', fromDaysAgo: 13, toDaysAgo: 0 },
-  { key: 'lastMonth', fromDaysAgo: 29, toDaysAgo: 0 },
-  { key: 'last3months', fromDaysAgo: 89, toDaysAgo: 0 },
-  { key: 'last6months', fromDaysAgo: 179, toDaysAgo: 0 },
-  { key: 'lastYear', fromDaysAgo: 364, toDaysAgo: 0 },
-];
+function buildDatePresets() {
+  const today = dayjs().startOf('day');
+  return [
+    { key: 'today', from: today, to: today },
+    { key: 'yesterday', from: today.subtract(1, 'day'), to: today.subtract(1, 'day') },
+    { key: 'dayBeforeYesterday', from: today.subtract(2, 'day'), to: today.subtract(2, 'day') },
+    { key: 'last3days', from: today.subtract(2, 'day'), to: today },
+    { key: 'last7days', from: today.subtract(6, 'day'), to: today },
+    { key: 'thisWeek', from: today.startOf('isoWeek'), to: today },
+    { key: 'lastWeek', from: today.subtract(1, 'week').startOf('isoWeek'), to: today.subtract(1, 'week').endOf('isoWeek').startOf('day') },
+    { key: 'thisMonth', from: today.startOf('month'), to: today },
+    { key: 'lastMonth', from: today.subtract(1, 'month').startOf('month'), to: today.subtract(1, 'month').endOf('month').startOf('day') },
+  ];
+}
 type TabType = 'overview' | 'devices' | 'api-keys';
 
 export default function DashboardClient({ user }: { user: User }) {
@@ -154,14 +160,11 @@ export default function DashboardClient({ user }: { user: User }) {
   };
 
   const rangePresets = useMemo(() =>
-    DATE_PRESETS.map(preset => ({
+    buildDatePresets().map(preset => ({
       label: preset.key === 'today'
         ? t('dashboard.timeRange.today')
         : t(`dashboard.timeRange.presets.${preset.key}`),
-      value: [
-        dayjs().subtract(preset.fromDaysAgo, 'day').startOf('day'),
-        dayjs().subtract(preset.toDaysAgo, 'day').startOf('day'),
-      ] as [dayjs.Dayjs, dayjs.Dayjs],
+      value: [preset.from, preset.to] as [dayjs.Dayjs, dayjs.Dayjs],
     })),
   [t]);
 
@@ -305,7 +308,6 @@ export default function DashboardClient({ user }: { user: User }) {
                       }
                     }}
                     disabledDate={(current) => current.isAfter(dayjs(), 'day')}
-                    size="small"
                     allowClear={false}
                     style={{ width: '100%' }}
                   />

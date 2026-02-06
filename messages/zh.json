@@ -31,13 +31,13 @@
       "custom": "自定义",
       "presets": {
         "yesterday": "昨天",
-        "last3days": "近 3 天",
-        "last7days": "近 7 天",
-        "last2weeks": "近 2 周",
-        "lastMonth": "近 1 个月",
-        "last3months": "近 3 个月",
-        "last6months": "近 6 个月",
-        "lastYear": "近 1 年"
+        "dayBeforeYesterday": "前天",
+        "last3days": "近三天",
+        "last7days": "近七天",
+        "thisWeek": "本周",
+        "lastWeek": "上周",
+        "thisMonth": "本月",
+        "lastMonth": "上个月"
       }
     },
     "stats": {

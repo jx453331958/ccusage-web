@@ -82,6 +82,19 @@
   display: none;
 }
 
+/* Antd RangePicker: match height with adjacent buttons (h-9 = 36px) and remove focus glow */
+.ant-picker.ant-picker-range {
+  height: 36px;
+  border-color: hsl(var(--input));
+}
+.ant-picker.ant-picker-range:hover {
+  border-color: hsl(var(--input));
+}
+.ant-picker.ant-picker-range.ant-picker-focused {
+  border-color: hsl(var(--input));
+  box-shadow: none;
+}
+
 /* Antd RangePicker: mobile responsive popup */
 @media (max-width: 640px) {
   .ant-picker-dropdown .ant-picker-panel-container {

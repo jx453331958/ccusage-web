@@ -31,13 +31,13 @@
       "custom": "Custom Range",
       "presets": {
         "yesterday": "Yesterday",
+        "dayBeforeYesterday": "Day Before Yesterday",
         "last3days": "Last 3 Days",
         "last7days": "Last 7 Days",
-        "last2weeks": "Last 2 Weeks",
-        "lastMonth": "Last Month",
-        "last3months": "Last 3 Months",
-        "last6months": "Last 6 Months",
-        "lastYear": "Last Year"
+        "thisWeek": "This Week",
+        "lastWeek": "Last Week",
+        "thisMonth": "This Month",
+        "lastMonth": "Last Month"
       }
     },
     "stats": {
