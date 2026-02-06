@@ -95,10 +95,27 @@
   box-shadow: none;
 }
 
+/* Antd RangePicker: prevent iOS auto-zoom on input focus (requires font-size >= 16px) */
+.ant-picker.ant-picker-range input {
+  font-size: 16px !important;
+}
+
 /* Antd RangePicker: mobile responsive popup */
 @media (max-width: 640px) {
+  .ant-picker-dropdown {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+  .ant-picker-dropdown .ant-picker-range-wrapper {
+    max-width: 100vw !important;
+    overflow-x: auto !important;
+  }
   .ant-picker-dropdown .ant-picker-panel-container {
     flex-direction: column !important;
+    max-width: 100vw !important;
+    overflow-x: auto !important;
   }
   .ant-picker-dropdown .ant-picker-panels {
     flex-direction: column !important;
