@@ -288,16 +288,16 @@ export default function UsageTrend({
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="space-y-2">
+            <div className="space-y-1">
               <CardTitle>{t('title')}</CardTitle>
               <CardDescription>
                 {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}
               </CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex gap-1.5">
                 <Button
                   size="sm"
                   variant={viewMode === 'total' ? 'default' : 'outline'}
@@ -325,20 +325,18 @@ export default function UsageTrend({
               </div>
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">{t('intervalLabel')}</label>
-            <div className="flex flex-wrap gap-2">
-              {INTERVAL_OPTIONS.map((option) => (
-                <Button
-                  key={option.value}
-                  size="sm"
-                  variant={interval === option.value ? 'default' : 'outline'}
-                  onClick={() => onIntervalChange(option.value)}
-                >
-                  {t(`interval.${option.labelKey}`)}
-                </Button>
-              ))}
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-gray-700">{t('intervalLabel')}</span>
+            {INTERVAL_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                size="sm"
+                variant={interval === option.value ? 'default' : 'outline'}
+                onClick={() => onIntervalChange(option.value)}
+              >
+                {t(`interval.${option.labelKey}`)}
+              </Button>
+            ))}
           </div>
         </div>
       </CardHeader>

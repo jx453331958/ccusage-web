@@ -42,8 +42,8 @@ export default function LanguageSwitcher({ currentLocale = 'en' }: LanguageSwitc
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          <Languages className="h-4 w-4 mr-2" />
-          {currentLanguage.nativeName}
+          <Languages className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">{currentLanguage.nativeName}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

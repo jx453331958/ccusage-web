@@ -286,14 +286,14 @@ export default function DashboardClient({ user }: { user: User }) {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Filters Row */}
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               {/* Device Selector */}
               <div className="relative" ref={deviceDropdownRef}>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
-                  className="min-w-[160px] justify-between"
+                  className="sm:min-w-[160px] justify-between"
                 >
                   <span className="flex items-center gap-2">
                     <Monitor className="h-4 w-4" />
@@ -337,65 +337,62 @@ export default function DashboardClient({ user }: { user: User }) {
                 )}
               </div>
 
-              {/* Divider */}
-              <div className="h-6 w-px bg-gray-200" />
+              {/* Divider - desktop only */}
+              <div className="h-6 w-px bg-gray-200 hidden sm:block" />
 
-              {/* Time Range Selector */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  size="sm"
-                  variant={rangeType === 'today' ? 'default' : 'outline'}
-                  onClick={() => setRangeType('today')}
-                >
-                  {t('dashboard.timeRange.today')}
-                </Button>
+              {/* Time Range Selector - flattened, no wrapper */}
+              <Button
+                size="sm"
+                variant={rangeType === 'today' ? 'default' : 'outline'}
+                onClick={() => setRangeType('today')}
+              >
+                {t('dashboard.timeRange.today')}
+              </Button>
 
-                <Popover open={calendarOpen} onOpenChange={handleCalendarOpenChange}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant={rangeType === 'custom' ? 'default' : 'outline'}
-                      className="min-w-[140px]"
-                    >
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      {rangeType === 'custom' && customDateRange ? (
-                        <span className="text-xs">
-                          {format(customDateRange.from, 'MM/dd') === format(customDateRange.to, 'MM/dd')
-                            ? format(customDateRange.from, 'MM/dd')
-                            : `${format(customDateRange.from, 'MM/dd')} - ${format(customDateRange.to, 'MM/dd')}`}
-                        </span>
-                      ) : (
-                        t('dashboard.timeRange.custom')
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <div className="flex flex-col sm:flex-row">
-                      <div className="border-b sm:border-b-0 sm:border-r p-2 flex sm:flex-col gap-0.5 overflow-x-auto">
-                        {DATE_PRESETS.map((preset) => (
-                          <button
-                            key={preset.key}
-                            onClick={() => handlePresetSelect(preset.fromDaysAgo, preset.toDaysAgo)}
-                            className="text-sm text-left px-3 py-1.5 rounded-md hover:bg-gray-100 text-gray-700 whitespace-nowrap transition-colors"
-                          >
-                            {t(`dashboard.timeRange.presets.${preset.key}`)}
-                          </button>
-                        ))}
-                      </div>
-                      <DatePicker
-                        selectsRange
-                        inline
-                        startDate={pickerStartDate}
-                        endDate={pickerEndDate}
-                        onChange={handleCalendarChange}
-                        monthsShown={isMobile ? 1 : 2}
-                        maxDate={new Date()}
-                        locale={locale === 'zh' ? zhCN : undefined}
-                      />
+              <Popover open={calendarOpen} onOpenChange={handleCalendarOpenChange}>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={rangeType === 'custom' ? 'default' : 'outline'}
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {rangeType === 'custom' && customDateRange ? (
+                      <span className="text-xs">
+                        {format(customDateRange.from, 'MM/dd') === format(customDateRange.to, 'MM/dd')
+                          ? format(customDateRange.from, 'MM/dd')
+                          : `${format(customDateRange.from, 'MM/dd')} - ${format(customDateRange.to, 'MM/dd')}`}
+                      </span>
+                    ) : (
+                      t('dashboard.timeRange.custom')
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="border-b sm:border-b-0 sm:border-r p-2 flex sm:flex-col gap-0.5 overflow-x-auto">
+                      {DATE_PRESETS.map((preset) => (
+                        <button
+                          key={preset.key}
+                          onClick={() => handlePresetSelect(preset.fromDaysAgo, preset.toDaysAgo)}
+                          className="text-sm text-left px-3 py-1.5 rounded-md hover:bg-gray-100 text-gray-700 whitespace-nowrap transition-colors"
+                        >
+                          {t(`dashboard.timeRange.presets.${preset.key}`)}
+                        </button>
+                      ))}
                     </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    <DatePicker
+                      selectsRange
+                      inline
+                      startDate={pickerStartDate}
+                      endDate={pickerEndDate}
+                      onChange={handleCalendarChange}
+                      monthsShown={isMobile ? 1 : 2}
+                      maxDate={new Date()}
+                      locale={locale === 'zh' ? zhCN : undefined}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {loading ? (
