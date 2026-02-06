@@ -239,14 +239,14 @@ export default function DashboardClient({ user }: { user: User }) {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Filters Row */}
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 sm:flex-wrap">
               {/* Device Selector */}
               <div className="relative" ref={deviceDropdownRef}>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
-                  className="sm:min-w-[160px] justify-between"
+                  className="w-full sm:w-auto sm:min-w-[160px] justify-between"
                 >
                   <span className="flex items-center gap-2">
                     <Monitor className="h-4 w-4" />
@@ -294,20 +294,23 @@ export default function DashboardClient({ user }: { user: User }) {
               <div className="h-6 w-px bg-gray-200 hidden sm:block" />
 
               {/* Date Range Picker */}
-              <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
-                <DatePicker.RangePicker
-                  presets={rangePresets}
-                  value={dateRange}
-                  onChange={(dates) => {
-                    if (dates && dates[0] && dates[1]) {
-                      setDateRange([dates[0].startOf('day'), dates[1].startOf('day')]);
-                    }
-                  }}
-                  disabledDate={(current) => current.isAfter(dayjs(), 'day')}
-                  size="small"
-                  allowClear={false}
-                />
-              </ConfigProvider>
+              <div className="w-full sm:w-auto">
+                <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
+                  <DatePicker.RangePicker
+                    presets={rangePresets}
+                    value={dateRange}
+                    onChange={(dates) => {
+                      if (dates && dates[0] && dates[1]) {
+                        setDateRange([dates[0].startOf('day'), dates[1].startOf('day')]);
+                      }
+                    }}
+                    disabledDate={(current) => current.isAfter(dayjs(), 'day')}
+                    size="small"
+                    allowClear={false}
+                    style={{ width: '100%' }}
+                  />
+                </ConfigProvider>
+              </div>
             </div>
 
             {loading ? (

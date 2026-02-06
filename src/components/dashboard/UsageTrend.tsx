@@ -287,7 +287,7 @@ export default function UsageTrend({
   const chartOption = viewMode === 'total' ? totalChartOption : modelChartOption;
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <div className="flex flex-col gap-3">
           {/* Title + desktop controls */}
