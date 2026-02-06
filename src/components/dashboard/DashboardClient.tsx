@@ -53,6 +53,16 @@ export default function DashboardClient({ user }: { user: User }) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -341,8 +351,8 @@ export default function DashboardClient({ user }: { user: User }) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <div className="flex">
-                      <div className="border-r p-2 flex flex-col gap-0.5 min-w-[100px]">
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="border-b sm:border-b-0 sm:border-r p-2 flex sm:flex-col gap-0.5 overflow-x-auto">
                         {DATE_PRESETS.map((preset) => (
                           <button
                             key={preset.key}
@@ -357,7 +367,7 @@ export default function DashboardClient({ user }: { user: User }) {
                         mode="range"
                         selected={customDateRange ? { from: customDateRange.from, to: customDateRange.to } : undefined}
                         onSelect={handleDateRangeSelect}
-                        numberOfMonths={2}
+                        numberOfMonths={isMobile ? 1 : 2}
                         disabled={{ after: new Date() }}
                       />
                     </div>
