@@ -24,9 +24,8 @@ interface User {
 
 export type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d' | 'auto';
 
-type RangeType = 'today' | 'custom';
-
 const DATE_PRESETS = [
+  { key: 'today', fromDaysAgo: 0, toDaysAgo: 0 },
   { key: 'yesterday', fromDaysAgo: 1, toDaysAgo: 1 },
   { key: 'last3days', fromDaysAgo: 2, toDaysAgo: 0 },
   { key: 'last7days', fromDaysAgo: 6, toDaysAgo: 0 },
@@ -43,8 +42,10 @@ export default function DashboardClient({ user }: { user: User }) {
   const t = useTranslations();
   const locale = useLocale();
   const [stats, setStats] = useState<any>(null);
-  const [rangeType, setRangeType] = useState<RangeType>('today');
-  const [customDateRange, setCustomDateRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>(() => [
+    dayjs().startOf('day'),
+    dayjs().startOf('day'),
+  ]);
   const [interval, setInterval] = useState<Interval>('auto');
   const [loading, setLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false); // Loading state for data switching
@@ -67,32 +68,19 @@ export default function DashboardClient({ user }: { user: User }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Build URL for API call - always pass from/to timestamps to ensure correct timezone handling
+  // Stable key for dateRange to use in useEffect deps
+  const dateRangeKey = `${dateRange[0].valueOf()}-${dateRange[1].valueOf()}`;
+
+  // Build URL for API call
   const buildStatsUrl = useCallback((intervalOverride?: Interval) => {
     const effectiveInterval = intervalOverride ?? interval;
     let url = `/api/usage/stats?interval=${effectiveInterval}`;
 
-    const now = new Date();
-    let from: number;
-    let to: number = Math.floor(now.getTime() / 1000);
-
-    if (rangeType === 'today') {
-      // Today: from local midnight to now
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      from = Math.floor(today.getTime() / 1000);
-    } else if (rangeType === 'custom' && customDateRange) {
-      from = Math.floor(customDateRange.from.getTime() / 1000);
-      // End of the selected day
-      const endDate = new Date(customDateRange.to);
-      endDate.setHours(23, 59, 59, 999);
-      to = Math.floor(endDate.getTime() / 1000);
-    } else {
-      // Default to today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      from = Math.floor(today.getTime() / 1000);
-    }
+    const from = Math.floor(dateRange[0].startOf('day').valueOf() / 1000);
+    // If end date is today, use current time; otherwise end of day
+    const to = dateRange[1].isSame(dayjs(), 'day')
+      ? Math.floor(Date.now() / 1000)
+      : Math.floor(dateRange[1].endOf('day').valueOf() / 1000);
 
     url += `&from=${from}&to=${to}`;
 
@@ -101,7 +89,7 @@ export default function DashboardClient({ user }: { user: User }) {
     }
 
     return url;
-  }, [rangeType, customDateRange, interval, selectedDevice]);
+  }, [dateRangeKey, interval, selectedDevice]);
 
   // Full fetch - shows loading state, updates all data
   const fetchStats = useCallback(async () => {
@@ -151,7 +139,7 @@ export default function DashboardClient({ user }: { user: User }) {
   // Initial load and when filter params change (except interval)
   useEffect(() => {
     fetchStats();
-  }, [rangeType, customDateRange, selectedDevice]); // Note: interval not included
+  }, [dateRangeKey, selectedDevice]); // Note: interval not included
 
   // Handle interval change - only update chart, no full page reload
   const handleIntervalChange = useCallback((newInterval: Interval) => {
@@ -167,7 +155,9 @@ export default function DashboardClient({ user }: { user: User }) {
 
   const rangePresets = useMemo(() =>
     DATE_PRESETS.map(preset => ({
-      label: t(`dashboard.timeRange.presets.${preset.key}`),
+      label: preset.key === 'today'
+        ? t('dashboard.timeRange.today')
+        : t(`dashboard.timeRange.presets.${preset.key}`),
       value: [
         dayjs().subtract(preset.fromDaysAgo, 'day').startOf('day'),
         dayjs().subtract(preset.toDaysAgo, 'day').startOf('day'),
@@ -303,25 +293,14 @@ export default function DashboardClient({ user }: { user: User }) {
               {/* Divider - desktop only */}
               <div className="h-6 w-px bg-gray-200 hidden sm:block" />
 
-              {/* Time Range Selector - flattened, no wrapper */}
-              <Button
-                size="sm"
-                variant={rangeType === 'today' ? 'default' : 'outline'}
-                onClick={() => setRangeType('today')}
-              >
-                {t('dashboard.timeRange.today')}
-              </Button>
-
+              {/* Date Range Picker */}
               <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
                 <DatePicker.RangePicker
                   presets={rangePresets}
-                  value={rangeType === 'custom' && customDateRange
-                    ? [dayjs(customDateRange.from), dayjs(customDateRange.to)]
-                    : null}
+                  value={dateRange}
                   onChange={(dates) => {
                     if (dates && dates[0] && dates[1]) {
-                      setCustomDateRange({ from: dates[0].toDate(), to: dates[1].toDate() });
-                      setRangeType('custom');
+                      setDateRange([dates[0].startOf('day'), dates[1].startOf('day')]);
                     }
                   }}
                   disabledDate={(current) => current.isAfter(dayjs(), 'day')}
