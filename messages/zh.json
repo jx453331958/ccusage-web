@@ -28,9 +28,16 @@
     },
     "timeRange": {
       "today": "今天",
-      "7d": "7 天",
-      "30d": "30 天",
-      "custom": "自定义"
+      "custom": "自定义",
+      "presets": {
+        "yesterday": "昨天",
+        "dayBeforeYesterday": "前天",
+        "last3days": "近 3 天",
+        "last7days": "近 7 天",
+        "last30days": "近 30 天",
+        "halfYear": "半年",
+        "fullYear": "全年"
+      }
     },
     "stats": {
       "totalTokens": "总 Token 数",

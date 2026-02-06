@@ -22,7 +22,17 @@ interface User {
 
 export type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d' | 'auto';
 
-type RangeType = 'today' | '7d' | '30d' | 'custom';
+type RangeType = 'today' | 'custom';
+
+const DATE_PRESETS = [
+  { key: 'yesterday', fromDaysAgo: 1, toDaysAgo: 1 },
+  { key: 'dayBeforeYesterday', fromDaysAgo: 2, toDaysAgo: 2 },
+  { key: 'last3days', fromDaysAgo: 2, toDaysAgo: 0 },
+  { key: 'last7days', fromDaysAgo: 6, toDaysAgo: 0 },
+  { key: 'last30days', fromDaysAgo: 29, toDaysAgo: 0 },
+  { key: 'halfYear', fromDaysAgo: 179, toDaysAgo: 0 },
+  { key: 'fullYear', fromDaysAgo: 364, toDaysAgo: 0 },
+];
 type TabType = 'overview' | 'devices' | 'api-keys';
 
 export default function DashboardClient({ user }: { user: User }) {
@@ -40,6 +50,7 @@ export default function DashboardClient({ user }: { user: User }) {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
 
@@ -68,18 +79,6 @@ export default function DashboardClient({ user }: { user: User }) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       from = Math.floor(today.getTime() / 1000);
-    } else if (rangeType === '7d') {
-      // Last 7 days: from 7 days ago at local midnight
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 6);
-      startDate.setHours(0, 0, 0, 0);
-      from = Math.floor(startDate.getTime() / 1000);
-    } else if (rangeType === '30d') {
-      // Last 30 days: from 30 days ago at local midnight
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 29);
-      startDate.setHours(0, 0, 0, 0);
-      from = Math.floor(startDate.getTime() / 1000);
     } else if (rangeType === 'custom' && customDateRange) {
       from = Math.floor(customDateRange.from.getTime() / 1000);
       // End of the selected day
@@ -168,7 +167,20 @@ export default function DashboardClient({ user }: { user: User }) {
     if (range?.from && range?.to) {
       setCustomDateRange({ from: range.from, to: range.to });
       setRangeType('custom');
+      setCalendarOpen(false);
     }
+  };
+
+  const handlePresetSelect = (fromDaysAgo: number, toDaysAgo: number) => {
+    const from = new Date();
+    from.setDate(from.getDate() - fromDaysAgo);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date();
+    to.setDate(to.getDate() - toDaysAgo);
+    to.setHours(0, 0, 0, 0);
+    setCustomDateRange({ from, to });
+    setRangeType('custom');
+    setCalendarOpen(false);
   };
 
   const tabs: { id: TabType; icon: React.ReactNode; label: string }[] = [
@@ -308,22 +320,8 @@ export default function DashboardClient({ user }: { user: User }) {
                 >
                   {t('dashboard.timeRange.today')}
                 </Button>
-                <Button
-                  size="sm"
-                  variant={rangeType === '7d' ? 'default' : 'outline'}
-                  onClick={() => setRangeType('7d')}
-                >
-                  {t('dashboard.timeRange.7d')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={rangeType === '30d' ? 'default' : 'outline'}
-                  onClick={() => setRangeType('30d')}
-                >
-                  {t('dashboard.timeRange.30d')}
-                </Button>
 
-                <Popover>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       size="sm"
@@ -333,7 +331,9 @@ export default function DashboardClient({ user }: { user: User }) {
                       <CalendarIcon className="h-4 w-4 mr-2" />
                       {rangeType === 'custom' && customDateRange ? (
                         <span className="text-xs">
-                          {format(customDateRange.from, 'MM/dd')} - {format(customDateRange.to, 'MM/dd')}
+                          {format(customDateRange.from, 'MM/dd') === format(customDateRange.to, 'MM/dd')
+                            ? format(customDateRange.from, 'MM/dd')
+                            : `${format(customDateRange.from, 'MM/dd')} - ${format(customDateRange.to, 'MM/dd')}`}
                         </span>
                       ) : (
                         t('dashboard.timeRange.custom')
@@ -341,13 +341,26 @@ export default function DashboardClient({ user }: { user: User }) {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={customDateRange ? { from: customDateRange.from, to: customDateRange.to } : undefined}
-                      onSelect={handleDateRangeSelect}
-                      numberOfMonths={2}
-                      disabled={{ after: new Date() }}
-                    />
+                    <div className="flex">
+                      <div className="border-r p-2 flex flex-col gap-0.5 min-w-[100px]">
+                        {DATE_PRESETS.map((preset) => (
+                          <button
+                            key={preset.key}
+                            onClick={() => handlePresetSelect(preset.fromDaysAgo, preset.toDaysAgo)}
+                            className="text-sm text-left px-3 py-1.5 rounded-md hover:bg-gray-100 text-gray-700 whitespace-nowrap transition-colors"
+                          >
+                            {t(`dashboard.timeRange.presets.${preset.key}`)}
+                          </button>
+                        ))}
+                      </div>
+                      <Calendar
+                        mode="range"
+                        selected={customDateRange ? { from: customDateRange.from, to: customDateRange.to } : undefined}
+                        onSelect={handleDateRangeSelect}
+                        numberOfMonths={2}
+                        disabled={{ after: new Date() }}
+                      />
+                    </div>
                   </PopoverContent>
                 </Popover>
               </div>
