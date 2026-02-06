@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { format } from 'date-fns';
-import { zhCN } from 'date-fns/locale/zh-CN';
-import { Calendar } from '@/components/ui/calendar';
-import type { DateRange } from 'react-day-picker';
+import dayjs from 'dayjs';
+import { DatePicker, ConfigProvider } from 'antd';
+import antdZhCN from 'antd/locale/zh_CN';
+import 'dayjs/locale/zh-cn';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { LogOut, Activity, Settings, CalendarIcon, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2 } from 'lucide-react';
+import { LogOut, Activity, Settings, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2 } from 'lucide-react';
 import StatsOverview from './StatsOverview';
 import DeviceList from './DeviceList';
 import ApiKeyManager from './ApiKeyManager';
@@ -53,20 +53,8 @@ export default function DashboardClient({ user }: { user: User }) {
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [pickerRange, setPickerRange] = useState<DateRange | undefined>(undefined);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detect mobile viewport
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)');
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -177,35 +165,15 @@ export default function DashboardClient({ user }: { user: User }) {
     router.refresh();
   };
 
-  const handleCalendarOpenChange = (open: boolean) => {
-    setCalendarOpen(open);
-    if (open && customDateRange) {
-      setPickerRange({ from: customDateRange.from, to: customDateRange.to });
-    } else if (open) {
-      setPickerRange(undefined);
-    }
-  };
-
-  const handleCalendarSelect = (range: DateRange | undefined) => {
-    setPickerRange(range);
-    if (range?.from && range?.to) {
-      setCustomDateRange({ from: range.from, to: range.to });
-      setRangeType('custom');
-      setCalendarOpen(false);
-    }
-  };
-
-  const handlePresetSelect = (fromDaysAgo: number, toDaysAgo: number) => {
-    const from = new Date();
-    from.setDate(from.getDate() - fromDaysAgo);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date();
-    to.setDate(to.getDate() - toDaysAgo);
-    to.setHours(0, 0, 0, 0);
-    setCustomDateRange({ from, to });
-    setRangeType('custom');
-    setCalendarOpen(false);
-  };
+  const rangePresets = useMemo(() =>
+    DATE_PRESETS.map(preset => ({
+      label: t(`dashboard.timeRange.presets.${preset.key}`),
+      value: [
+        dayjs().subtract(preset.fromDaysAgo, 'day').startOf('day'),
+        dayjs().subtract(preset.toDaysAgo, 'day').startOf('day'),
+      ] as [dayjs.Dayjs, dayjs.Dayjs],
+    })),
+  [t]);
 
   const tabs: { id: TabType; icon: React.ReactNode; label: string }[] = [
     { id: 'overview', icon: <BarChart3 className="h-4 w-4" />, label: t('dashboard.tabs.overview') },
@@ -344,48 +312,23 @@ export default function DashboardClient({ user }: { user: User }) {
                 {t('dashboard.timeRange.today')}
               </Button>
 
-              <Popover open={calendarOpen} onOpenChange={handleCalendarOpenChange}>
-                <PopoverTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant={rangeType === 'custom' ? 'default' : 'outline'}
-                  >
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    {rangeType === 'custom' && customDateRange ? (
-                      <span className="text-xs">
-                        {format(customDateRange.from, 'MM/dd') === format(customDateRange.to, 'MM/dd')
-                          ? format(customDateRange.from, 'MM/dd')
-                          : `${format(customDateRange.from, 'MM/dd')} - ${format(customDateRange.to, 'MM/dd')}`}
-                      </span>
-                    ) : (
-                      t('dashboard.timeRange.custom')
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="border-b sm:border-b-0 sm:border-r p-2 flex sm:flex-col gap-0.5 overflow-x-auto">
-                      {DATE_PRESETS.map((preset) => (
-                        <button
-                          key={preset.key}
-                          onClick={() => handlePresetSelect(preset.fromDaysAgo, preset.toDaysAgo)}
-                          className="text-sm text-left px-3 py-1.5 rounded-md hover:bg-gray-100 text-gray-700 whitespace-nowrap transition-colors"
-                        >
-                          {t(`dashboard.timeRange.presets.${preset.key}`)}
-                        </button>
-                      ))}
-                    </div>
-                    <Calendar
-                      mode="range"
-                      selected={pickerRange}
-                      onSelect={handleCalendarSelect}
-                      numberOfMonths={isMobile ? 1 : 2}
-                      disabled={{ after: new Date() }}
-                      locale={locale === 'zh' ? zhCN : undefined}
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
+                <DatePicker.RangePicker
+                  presets={rangePresets}
+                  value={rangeType === 'custom' && customDateRange
+                    ? [dayjs(customDateRange.from), dayjs(customDateRange.to)]
+                    : null}
+                  onChange={(dates) => {
+                    if (dates && dates[0] && dates[1]) {
+                      setCustomDateRange({ from: dates[0].toDate(), to: dates[1].toDate() });
+                      setRangeType('custom');
+                    }
+                  }}
+                  disabledDate={(current) => current.isAfter(dayjs(), 'day')}
+                  size="small"
+                  allowClear={false}
+                />
+              </ConfigProvider>
             </div>
 
             {loading ? (
