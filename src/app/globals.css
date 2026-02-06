@@ -72,68 +72,12 @@
   }
 }
 
-/* react-datepicker theme overrides */
-.react-datepicker {
-  border: none !important;
-  font-family: inherit !important;
-  font-size: 0.875rem !important;
+
+/* Hide scrollbar for horizontal scroll containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-.react-datepicker__header {
-  background-color: white !important;
-  border-bottom: 1px solid #e5e7eb !important;
-  padding-top: 0.5rem !important;
-}
-.react-datepicker__current-month {
-  font-weight: 500 !important;
-  font-size: 0.875rem !important;
-  padding-bottom: 0.25rem !important;
-}
-.react-datepicker__day-name {
-  color: #6b7280 !important;
-  font-weight: 400 !important;
-  width: 2.25rem !important;
-  line-height: 2.25rem !important;
-  font-size: 0.8rem !important;
-}
-.react-datepicker__day {
-  width: 2.25rem !important;
-  line-height: 2.25rem !important;
-  border-radius: 0.375rem !important;
-  margin: 0.1rem !important;
-}
-.react-datepicker__day:hover {
-  border-radius: 0.375rem !important;
-  background-color: #f3f4f6 !important;
-}
-.react-datepicker__day--selected,
-.react-datepicker__day--range-start,
-.react-datepicker__day--range-end {
-  background-color: #111827 !important;
-  color: white !important;
-  border-radius: 0.375rem !important;
-}
-.react-datepicker__day--in-range:not(.react-datepicker__day--range-start):not(.react-datepicker__day--range-end) {
-  background-color: #f3f4f6 !important;
-  color: #111827 !important;
-  border-radius: 0 !important;
-}
-.react-datepicker__day--in-selecting-range:not(.react-datepicker__day--in-range) {
-  background-color: #e5e7eb !important;
-  color: #111827 !important;
-}
-.react-datepicker__day--keyboard-selected {
-  background-color: transparent !important;
-  color: inherit !important;
-}
-.react-datepicker__day--today {
-  font-weight: 600 !important;
-}
-.react-datepicker__day--disabled {
-  color: #d1d5db !important;
-}
-.react-datepicker__navigation {
-  top: 0.625rem !important;
-}
-.react-datepicker__month-container + .react-datepicker__month-container {
-  border-left: 1px solid #e5e7eb;
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

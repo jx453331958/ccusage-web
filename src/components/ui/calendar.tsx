@@ -47,8 +47,8 @@ function Calendar({
         outside: "text-muted-foreground opacity-50",
         disabled: "text-muted-foreground opacity-50",
         range_middle: "bg-accent rounded-none",
-        range_start: "rounded-l-md",
-        range_end: "rounded-r-md",
+        range_start: "rounded-l-md rounded-r-none",
+        range_end: "rounded-r-md rounded-l-none",
         hidden: "invisible",
         ...classNames,
       }}

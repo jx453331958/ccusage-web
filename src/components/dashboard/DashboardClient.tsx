@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { format } from 'date-fns';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { zhCN } from 'date-fns/locale/zh-CN';
+import { Calendar } from '@/components/ui/calendar';
+import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LogOut, Activity, Settings, CalendarIcon, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2 } from 'lucide-react';
@@ -54,8 +54,7 @@ export default function DashboardClient({ user }: { user: User }) {
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [pickerStartDate, setPickerStartDate] = useState<Date | null>(null);
-  const [pickerEndDate, setPickerEndDate] = useState<Date | null>(null);
+  const [pickerRange, setPickerRange] = useState<DateRange | undefined>(undefined);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
   const isInitialLoad = useRef(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -181,20 +180,16 @@ export default function DashboardClient({ user }: { user: User }) {
   const handleCalendarOpenChange = (open: boolean) => {
     setCalendarOpen(open);
     if (open && customDateRange) {
-      setPickerStartDate(customDateRange.from);
-      setPickerEndDate(customDateRange.to);
+      setPickerRange({ from: customDateRange.from, to: customDateRange.to });
     } else if (open) {
-      setPickerStartDate(null);
-      setPickerEndDate(null);
+      setPickerRange(undefined);
     }
   };
 
-  const handleCalendarChange = (dates: [Date | null, Date | null]) => {
-    const [start, end] = dates;
-    setPickerStartDate(start);
-    setPickerEndDate(end);
-    if (start && end) {
-      setCustomDateRange({ from: start, to: end });
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    setPickerRange(range);
+    if (range?.from && range?.to) {
+      setCustomDateRange({ from: range.from, to: range.to });
       setRangeType('custom');
       setCalendarOpen(false);
     }
@@ -380,14 +375,12 @@ export default function DashboardClient({ user }: { user: User }) {
                         </button>
                       ))}
                     </div>
-                    <DatePicker
-                      selectsRange
-                      inline
-                      startDate={pickerStartDate}
-                      endDate={pickerEndDate}
-                      onChange={handleCalendarChange}
-                      monthsShown={isMobile ? 1 : 2}
-                      maxDate={new Date()}
+                    <Calendar
+                      mode="range"
+                      selected={pickerRange}
+                      onSelect={handleCalendarSelect}
+                      numberOfMonths={isMobile ? 1 : 2}
+                      disabled={{ after: new Date() }}
                       locale={locale === 'zh' ? zhCN : undefined}
                     />
                   </div>

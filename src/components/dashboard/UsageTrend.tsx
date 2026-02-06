@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Interval } from './DashboardClient';
 
 // Dynamic import to avoid SSR issues with ECharts
@@ -289,6 +290,7 @@ export default function UsageTrend({
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3">
+          {/* Title + desktop controls */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="space-y-1">
               <CardTitle>{t('title')}</CardTitle>
@@ -296,7 +298,8 @@ export default function UsageTrend({
                 {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
+            {/* Desktop: inline view mode + show zero */}
+            <div className="hidden sm:flex items-center gap-3">
               <div className="flex gap-1.5">
                 <Button
                   size="sm"
@@ -313,6 +316,7 @@ export default function UsageTrend({
                   {t('viewByModel')}
                 </Button>
               </div>
+              <div className="h-5 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <Switch
                   id="show-zero"
@@ -325,18 +329,63 @@ export default function UsageTrend({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-700">{t('intervalLabel')}</span>
+
+          {/* Mobile: segmented control for view mode */}
+          <div className="sm:hidden">
+            <div className="flex rounded-lg bg-muted p-1">
+              <button
+                className={cn(
+                  'flex-1 text-center text-sm font-medium py-1.5 rounded-md transition-all',
+                  viewMode === 'total'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+                onClick={() => setViewMode('total')}
+              >
+                {t('viewTotal')}
+              </button>
+              <button
+                className={cn(
+                  'flex-1 text-center text-sm font-medium py-1.5 rounded-md transition-all',
+                  viewMode === 'model'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground'
+                )}
+                onClick={() => setViewMode('model')}
+              >
+                {t('viewByModel')}
+              </button>
+            </div>
+          </div>
+
+          {/* Interval selector: scrollable on mobile, wrapping on desktop */}
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap scrollbar-hide -mx-6 px-6 sm:mx-0 sm:px-0">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0">
+              {t('intervalLabel')}
+            </span>
             {INTERVAL_OPTIONS.map((option) => (
               <Button
                 key={option.value}
                 size="sm"
                 variant={interval === option.value ? 'default' : 'outline'}
                 onClick={() => onIntervalChange(option.value)}
+                className="shrink-0 h-7 px-2.5 text-xs sm:h-9 sm:px-3 sm:text-sm"
               >
                 {t(`interval.${option.labelKey}`)}
               </Button>
             ))}
+          </div>
+
+          {/* Mobile: show zero values toggle */}
+          <div className="sm:hidden flex items-center justify-between">
+            <Label htmlFor="show-zero-mobile" className="text-sm text-muted-foreground cursor-pointer">
+              {t('showZeroValues')}
+            </Label>
+            <Switch
+              id="show-zero-mobile"
+              checked={showZeroValues}
+              onCheckedChange={setShowZeroValues}
+            />
           </div>
         </div>
       </CardHeader>
