@@ -1,4 +1,5 @@
 FROM node:20-alpine AS base
+# Built via GitHub Actions CI
 
 # Install dependencies only when needed
 FROM base AS deps
