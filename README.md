@@ -35,10 +35,13 @@ First, set up the monitoring server:
 
 #### Option A: Docker Deployment (Recommended)
 
-1. Clone the repository:
+1. Download deployment files:
 ```bash
-git clone git@github.com:jx453331958/ccusage-web.git
-cd ccusage-web
+mkdir ccusage-web && cd ccusage-web
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/deploy.sh -o deploy.sh
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/docker-compose.yml -o docker-compose.yml
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/.env.example -o .env.example
+chmod +x deploy.sh
 ```
 
 2. One-command deployment:
@@ -50,7 +53,7 @@ The script will:
 - Check Docker availability
 - Create `.env` file (you'll be prompted to edit it)
 - Create data directory
-- Build and start the container
+- Pull pre-built image from ghcr.io and start the container
 
 3. Access the dashboard at http://localhost:3000
    - Login with your configured credentials
@@ -60,7 +63,7 @@ The script will:
 
 ```bash
 ./deploy.sh deploy   # First-time deployment
-./deploy.sh update   # Pull latest code and rebuild
+./deploy.sh update   # Pull latest image and restart
 ./deploy.sh start    # Start the service
 ./deploy.sh stop     # Stop the service
 ./deploy.sh restart  # Restart the service
@@ -89,7 +92,8 @@ COOKIE_SECURE=false  # Set to true if using HTTPS
 
 2. Start with Docker Compose:
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 3. Access the dashboard at http://localhost:3000

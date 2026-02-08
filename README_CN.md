@@ -35,10 +35,13 @@
 
 #### 方式 A: Docker 部署（推荐）
 
-1. 克隆仓库：
+1. 下载部署文件：
 ```bash
-git clone git@github.com:jx453331958/ccusage-web.git
-cd ccusage-web
+mkdir ccusage-web && cd ccusage-web
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/deploy.sh -o deploy.sh
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/docker-compose.yml -o docker-compose.yml
+curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/.env.example -o .env.example
+chmod +x deploy.sh
 ```
 
 2. 一键部署：
@@ -50,7 +53,7 @@ cd ccusage-web
 - 检查 Docker 是否可用
 - 创建 `.env` 文件（会提示你编辑配置）
 - 创建数据目录
-- 构建并启动容器
+- 从 ghcr.io 拉取预构建镜像并启动容器
 
 3. 访问仪表板 http://localhost:3000
    - 使用配置的凭据登录
@@ -60,7 +63,7 @@ cd ccusage-web
 
 ```bash
 ./deploy.sh deploy   # 首次部署
-./deploy.sh update   # 拉取最新代码并重新构建
+./deploy.sh update   # 拉取最新镜像并重启
 ./deploy.sh start    # 启动服务
 ./deploy.sh stop     # 停止服务
 ./deploy.sh restart  # 重启服务
@@ -89,7 +92,8 @@ COOKIE_SECURE=false  # 如果使用 HTTPS 请设为 true
 
 2. 使用 Docker Compose 启动：
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 3. 访问仪表板 http://localhost:3000
