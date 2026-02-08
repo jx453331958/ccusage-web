@@ -7,6 +7,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Image name
+IMAGE="ghcr.io/jx453331958/ccusage-web:latest"
+
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -44,7 +47,6 @@ init_env() {
         print_info "Creating .env file from .env.example..."
         cp .env.example .env
         print_warn "Please edit .env file to set your configuration:"
-        print_warn "  - JWT_SECRET: Change to a random secret key"
         print_warn "  - ADMIN_PASSWORD: Change to a secure password"
         echo ""
         read -p "Press Enter to continue after editing .env, or Ctrl+C to abort..."
@@ -70,8 +72,11 @@ deploy() {
     init_env
     init_data_dir
 
-    print_info "Building and starting containers..."
-    docker compose up -d --build
+    print_info "Pulling latest image..."
+    docker compose pull
+
+    print_info "Starting containers..."
+    docker compose up -d
 
     print_info "Waiting for service to be ready..."
     sleep 5
@@ -90,22 +95,17 @@ deploy() {
     fi
 }
 
-# Update (pull latest and rebuild)
+# Update (pull latest image and restart)
 update() {
     print_info "Starting update..."
 
     check_docker
 
-    # Check if git is available and this is a git repo
-    if command -v git &> /dev/null && [ -d .git ]; then
-        print_info "Pulling latest changes..."
-        git pull
-    else
-        print_warn "Not a git repository or git not installed. Skipping git pull."
-    fi
+    print_info "Pulling latest image..."
+    docker compose pull
 
-    print_info "Rebuilding and restarting containers..."
-    docker compose up -d --build
+    print_info "Restarting containers with new image..."
+    docker compose up -d
 
     print_info "Waiting for service to be ready..."
     sleep 5
@@ -164,7 +164,7 @@ clean() {
     read -p "Are you sure? (y/N) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker compose down --rmi local
+        docker compose down --rmi all
         print_info "Cleanup complete"
     else
         print_info "Cleanup cancelled"
@@ -178,8 +178,8 @@ show_help() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  deploy   - First-time deployment (init + build + start)"
-    echo "  update   - Pull latest code and rebuild"
+    echo "  deploy   - First-time deployment (init + pull + start)"
+    echo "  update   - Pull latest image and restart"
     echo "  start    - Start the service"
     echo "  stop     - Stop the service"
     echo "  restart  - Restart the service"
