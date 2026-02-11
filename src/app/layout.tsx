@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale } from '@/lib/locale';
+import ThemeProvider from '@/components/ThemeProvider';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -28,13 +29,15 @@ export default async function RootLayout({
   const messages = (await import(`../../messages/${locale}.json`)).default;
 
   return (
-    <html lang={locale}>
+    <html lang={locale} suppressHydrationWarning>
       <body className={inter.className}>
-        <AntdRegistry>
-          <NextIntlClientProvider locale={locale} messages={messages}>
-            {children}
-          </NextIntlClientProvider>
-        </AntdRegistry>
+        <ThemeProvider>
+          <AntdRegistry>
+            <NextIntlClientProvider locale={locale} messages={messages}>
+              {children}
+            </NextIntlClientProvider>
+          </AntdRegistry>
+        </ThemeProvider>
       </body>
     </html>
   );

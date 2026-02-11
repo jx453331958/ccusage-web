@@ -37,10 +37,10 @@ export default function DeviceList({ devices }: DeviceListProps) {
             devices.map((device) => (
               <div
                 key={device.device_name}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-gray-50 gap-3"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-accent gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg flex-shrink-0">
                     <Cpu className="h-5 w-5 text-blue-600" />
                   </div>
                   <div className="min-w-0 flex-1">

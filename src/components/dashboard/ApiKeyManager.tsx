@@ -126,15 +126,15 @@ export default function ApiKeyManager() {
               </DialogHeader>
               {newKey ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm font-medium text-green-900 mb-2">
+                  <div className="p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                    <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
                       {t('successTitle')}
                     </p>
-                    <p className="text-xs text-green-700 mb-3">
+                    <p className="text-xs text-green-700 dark:text-green-300 mb-3">
                       {t('successDescription')}
                     </p>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 p-2 bg-white border rounded text-xs break-all">
+                      <code className="flex-1 p-2 bg-background border rounded text-xs break-all">
                         {newKey.key}
                       </code>
                       <Button
@@ -150,14 +150,14 @@ export default function ApiKeyManager() {
                       </Button>
                     </div>
                   </div>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Terminal className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm font-medium text-blue-900">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                         {t('installTitle')}
                       </p>
                     </div>
-                    <p className="text-xs text-blue-700 mb-3">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
                       {t('installDescription')}
                     </p>
                     <div className="relative">
@@ -232,10 +232,10 @@ export default function ApiKeyManager() {
             apiKeys.map((apiKey) => (
               <div
                 key={apiKey.id}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-gray-50 gap-3"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-accent gap-3"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-950 rounded-lg flex-shrink-0">
                     <Key className="h-4 w-4 text-purple-600" />
                   </div>
                   <div className="flex-1 min-w-0">

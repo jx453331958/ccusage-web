@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useTranslations, useLocale } from 'next-intl';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
-import { DatePicker, ConfigProvider } from 'antd';
+import { DatePicker, ConfigProvider, theme as antdTheme } from 'antd';
 import antdZhCN from 'antd/locale/zh_CN';
 import 'dayjs/locale/zh-cn';
 
@@ -18,6 +19,7 @@ import DeviceList from './DeviceList';
 import ApiKeyManager from './ApiKeyManager';
 import UsageTrend from './UsageTrend';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import { cn } from '@/lib/utils';
 
 interface User {
@@ -45,8 +47,10 @@ type TabType = 'overview' | 'devices' | 'api-keys';
 
 export default function DashboardClient({ user }: { user: User }) {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
   const t = useTranslations();
   const locale = useLocale();
+  const isDark = resolvedTheme === 'dark';
   const [stats, setStats] = useState<any>(null);
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>(() => [
     dayjs().startOf('day'),
@@ -189,18 +193,18 @@ export default function DashboardClient({ user }: { user: User }) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-50">
+    <div className="min-h-screen bg-muted/50">
+      <header className="bg-background border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{t('common.appName')}</h1>
-                <p className="text-xs sm:text-sm text-gray-500 truncate">{t('common.appDescription')}</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">{t('common.appName')}</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">{t('common.appDescription')}</p>
               </div>
               {/* Tab Navigation Dropdown */}
-              <div className="h-6 w-px bg-gray-200 mx-2 hidden sm:block" />
+              <div className="h-6 w-px bg-border mx-2 hidden sm:block" />
               <Popover open={tabDropdownOpen} onOpenChange={setTabDropdownOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="min-w-[120px] justify-between">
@@ -222,8 +226,8 @@ export default function DashboardClient({ user }: { user: User }) {
                       className={cn(
                         "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
                         activeTab === tab.id
-                          ? "bg-gray-100 text-gray-900"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
                       )}
                     >
                       {tab.icon}
@@ -234,9 +238,10 @@ export default function DashboardClient({ user }: { user: User }) {
               </Popover>
             </div>
             <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-              <span className="text-xs sm:text-sm text-gray-600 hidden md:inline">
+              <span className="text-xs sm:text-sm text-muted-foreground hidden md:inline">
                 {t('common.welcome')}, <span className="font-medium">{user.username}</span>
               </span>
+              <ThemeSwitcher />
               <LanguageSwitcher currentLocale={locale} />
               <Button variant="outline" size="sm" onClick={() => router.push('/settings')} className="flex-shrink-0">
                 <Settings className="h-4 w-4 sm:mr-2" />
@@ -274,15 +279,15 @@ export default function DashboardClient({ user }: { user: User }) {
                   <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
                 </Button>
                 {deviceDropdownOpen && stats?.availableDevices && (
-                  <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-white border rounded-md shadow-lg py-1">
+                  <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-background border rounded-md shadow-lg py-1">
                     <button
                       onClick={() => {
                         setSelectedDevice(null);
                         setDeviceDropdownOpen(false);
                       }}
                       className={cn(
-                        "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2",
-                        !selectedDevice && "bg-gray-50 font-medium"
+                        "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
+                        !selectedDevice && "bg-accent/50 font-medium"
                       )}
                     >
                       <Monitor className="h-4 w-4" />
@@ -296,8 +301,8 @@ export default function DashboardClient({ user }: { user: User }) {
                           setDeviceDropdownOpen(false);
                         }}
                         className={cn(
-                          "w-full px-3 py-2 text-left text-sm hover:bg-gray-100 truncate",
-                          selectedDevice === device && "bg-gray-50 font-medium"
+                          "w-full px-3 py-2 text-left text-sm hover:bg-accent truncate",
+                          selectedDevice === device && "bg-accent/50 font-medium"
                         )}
                       >
                         {device}
@@ -308,11 +313,11 @@ export default function DashboardClient({ user }: { user: User }) {
               </div>
 
               {/* Divider - desktop only */}
-              <div className="h-6 w-px bg-gray-200 hidden sm:block" />
+              <div className="h-6 w-px bg-border hidden sm:block" />
 
               {/* Date Range Picker - Desktop */}
               <div className="hidden sm:block sm:w-auto">
-                <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
+                <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined} theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
                   <DatePicker.RangePicker
                     presets={rangePresets}
                     value={dateRange}
@@ -365,7 +370,7 @@ export default function DashboardClient({ user }: { user: User }) {
                   </Button>
                 </div>
                 {showCustomPicker && (
-                  <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined}>
+                  <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined} theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
                     <DatePicker.RangePicker
                       value={dateRange}
                       onChange={(dates) => {
@@ -391,7 +396,7 @@ export default function DashboardClient({ user }: { user: User }) {
 
             {loading ? (
               <div className="text-center py-12">
-                <div className="flex items-center justify-center gap-2 text-gray-500">
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>{t('common.loading')}</span>
                 </div>
@@ -400,8 +405,8 @@ export default function DashboardClient({ user }: { user: User }) {
               <div className="relative">
                 {/* Data loading overlay */}
                 {dataLoading && (
-                  <div className="absolute inset-0 bg-white/70 z-20 flex items-center justify-center rounded-lg backdrop-blur-[1px] transition-opacity duration-200">
-                    <div className="flex items-center gap-2 text-gray-600 bg-white/90 px-4 py-2 rounded-full shadow-sm">
+                  <div className="absolute inset-0 bg-background/70 z-20 flex items-center justify-center rounded-lg backdrop-blur-[1px] transition-opacity duration-200">
+                    <div className="flex items-center gap-2 text-muted-foreground bg-background/90 px-4 py-2 rounded-full shadow-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span className="text-sm font-medium">{t('common.loading')}</span>
                     </div>
@@ -428,7 +433,7 @@ export default function DashboardClient({ user }: { user: User }) {
           <div>
             {loading ? (
               <div className="text-center py-12">
-                <div className="flex items-center justify-center gap-2 text-gray-500">
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>{t('common.loading')}</span>
                 </div>
@@ -436,8 +441,8 @@ export default function DashboardClient({ user }: { user: User }) {
             ) : stats ? (
               <div className="relative">
                 {dataLoading && (
-                  <div className="absolute inset-0 bg-white/70 z-20 flex items-center justify-center rounded-lg backdrop-blur-[1px] transition-opacity duration-200">
-                    <div className="flex items-center gap-2 text-gray-600 bg-white/90 px-4 py-2 rounded-full shadow-sm">
+                  <div className="absolute inset-0 bg-background/70 z-20 flex items-center justify-center rounded-lg backdrop-blur-[1px] transition-opacity duration-200">
+                    <div className="flex items-center gap-2 text-muted-foreground bg-background/90 px-4 py-2 rounded-full shadow-sm">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span className="text-sm font-medium">{t('common.loading')}</span>
                     </div>

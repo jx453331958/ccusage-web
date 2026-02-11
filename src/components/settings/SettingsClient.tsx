@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 import type { User } from '@/lib/db';
 
 interface SettingsClientProps {
@@ -73,15 +74,16 @@ export default function SettingsClient({ user }: SettingsClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b">
+    <div className="min-h-screen bg-muted/50">
+      <header className="bg-background border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('settings.title')}</h1>
-              <p className="text-xs sm:text-sm text-gray-500">{t('settings.description')}</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('settings.title')}</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">{t('settings.description')}</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              <ThemeSwitcher />
               <LanguageSwitcher currentLocale={locale} />
               <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="flex-shrink-0">
                 {t('common.backToDashboard')}

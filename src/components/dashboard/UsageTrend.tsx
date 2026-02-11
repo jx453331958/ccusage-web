@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,8 +86,13 @@ export default function UsageTrend({
   loading = false,
 }: UsageTrendProps) {
   const t = useTranslations('dashboard.usageTrend');
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('total');
   const [showZeroValues, setShowZeroValues] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+  const isDark = mounted && resolvedTheme === 'dark';
 
   // Get unique models
   const models = useMemo(() => {
@@ -105,14 +111,23 @@ export default function UsageTrend({
       : trendData.filter((d) => d.input_tokens > 0 || d.output_tokens > 0 || d.total_tokens > 0);
     const timestamps = filteredData.map((d) => d.timestamp);
 
+    const textColor = isDark ? '#e5e7eb' : '#374151';
+    const tooltipBg = isDark ? '#1f2937' : '#fff';
+    const tooltipBorder = isDark ? '#374151' : '#e5e7eb';
+    const tooltipTextColor = isDark ? '#f3f4f6' : '#111827';
+
     return {
+      darkMode: isDark,
       tooltip: {
         trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        textStyle: { color: tooltipTextColor },
         formatter: (params: any) => {
           const timestamp = params[0]?.axisValue;
-          let html = `<div style="font-weight:bold;margin-bottom:4px">${formatFullTime(timestamp)}</div>`;
+          let html = `<div style="font-weight:bold;margin-bottom:4px;color:${tooltipTextColor}">${formatFullTime(timestamp)}</div>`;
           params.forEach((p: any) => {
-            html += `<div style="display:flex;align-items:center;gap:8px">
+            html += `<div style="display:flex;align-items:center;gap:8px;color:${tooltipTextColor}">
               <span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%"></span>
               <span>${p.seriesName}:</span>
               <span style="font-weight:bold">${formatNumber(p.value)}</span>
@@ -124,6 +139,7 @@ export default function UsageTrend({
       legend: {
         data: [t('inputTokens'), t('outputTokens'), t('totalTokens')],
         bottom: 0,
+        textStyle: { color: textColor },
       },
       grid: {
         left: 60,
@@ -136,13 +152,16 @@ export default function UsageTrend({
         data: timestamps,
         axisLabel: {
           formatter: (value: number) => formatTime(value, effectiveInterval),
+          color: textColor,
         },
       },
       yAxis: {
         type: 'value',
         axisLabel: {
           formatter: (value: number) => formatNumber(value),
+          color: textColor,
         },
+        splitLine: { lineStyle: { color: isDark ? '#374151' : '#e5e7eb' } },
       },
       dataZoom: [
         {
@@ -155,6 +174,7 @@ export default function UsageTrend({
           start: 0,
           end: 100,
           bottom: 30,
+          textStyle: { color: textColor },
         },
       ],
       series: [
@@ -181,7 +201,7 @@ export default function UsageTrend({
         },
       ],
     };
-  }, [trendData, effectiveInterval, t, showZeroValues]);
+  }, [trendData, effectiveInterval, t, showZeroValues, isDark]);
 
   // Build chart options for model view
   const modelChartOption = useMemo(() => {
@@ -223,17 +243,26 @@ export default function UsageTrend({
       };
     });
 
+    const textColor = isDark ? '#e5e7eb' : '#374151';
+    const tooltipBg = isDark ? '#1f2937' : '#fff';
+    const tooltipBorder = isDark ? '#374151' : '#e5e7eb';
+    const tooltipTextColor = isDark ? '#f3f4f6' : '#111827';
+
     return {
+      darkMode: isDark,
       tooltip: {
         trigger: 'axis',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
+        textStyle: { color: tooltipTextColor },
         formatter: (params: any) => {
           const timestamp = params[0]?.axisValue;
-          let html = `<div style="font-weight:bold;margin-bottom:4px">${formatFullTime(timestamp)}</div>`;
+          let html = `<div style="font-weight:bold;margin-bottom:4px;color:${tooltipTextColor}">${formatFullTime(timestamp)}</div>`;
           // Sort by value descending
           const sorted = [...params].sort((a: any, b: any) => b.value - a.value);
           sorted.forEach((p: any) => {
             if (p.value > 0) {
-              html += `<div style="display:flex;align-items:center;gap:8px">
+              html += `<div style="display:flex;align-items:center;gap:8px;color:${tooltipTextColor}">
                 <span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%"></span>
                 <span>${p.seriesName}:</span>
                 <span style="font-weight:bold">${formatNumber(p.value)}</span>
@@ -247,6 +276,7 @@ export default function UsageTrend({
         data: models.map((m) => m || t('unknownModel')),
         bottom: 0,
         type: 'scroll',
+        textStyle: { color: textColor },
       },
       grid: {
         left: 60,
@@ -259,13 +289,16 @@ export default function UsageTrend({
         data: timestamps,
         axisLabel: {
           formatter: (value: number) => formatTime(value, effectiveInterval),
+          color: textColor,
         },
       },
       yAxis: {
         type: 'value',
         axisLabel: {
           formatter: (value: number) => formatNumber(value),
+          color: textColor,
         },
+        splitLine: { lineStyle: { color: isDark ? '#374151' : '#e5e7eb' } },
       },
       dataZoom: [
         {
@@ -278,11 +311,12 @@ export default function UsageTrend({
           start: 0,
           end: 100,
           bottom: 30,
+          textStyle: { color: textColor },
         },
       ],
       series,
     };
-  }, [modelTrendData, models, effectiveInterval, t, showZeroValues]);
+  }, [modelTrendData, models, effectiveInterval, t, showZeroValues, isDark]);
 
   const chartOption = viewMode === 'total' ? totalChartOption : modelChartOption;
 
@@ -397,8 +431,8 @@ export default function UsageTrend({
         ) : (
           <div className="w-full relative">
             {loading && (
-              <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center backdrop-blur-[1px] transition-opacity duration-200">
-                <div className="flex items-center gap-2 text-gray-600 bg-white/90 px-4 py-2 rounded-full shadow-sm">
+              <div className="absolute inset-0 bg-background/70 z-10 flex items-center justify-center backdrop-blur-[1px] transition-opacity duration-200">
+                <div className="flex items-center gap-2 text-muted-foreground bg-background/90 px-4 py-2 rounded-full shadow-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm font-medium">{t('loading')}</span>
                 </div>
