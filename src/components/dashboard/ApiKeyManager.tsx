@@ -126,7 +126,7 @@ export default function ApiKeyManager() {
               </DialogHeader>
               {newKey ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800/50 rounded-lg">
                     <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
                       {t('successTitle')}
                     </p>
@@ -150,9 +150,9 @@ export default function ApiKeyManager() {
                       </Button>
                     </div>
                   </div>
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
-                      <Terminal className="h-4 w-4 text-blue-600" />
+                      <Terminal className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                         {t('installTitle')}
                       </p>
@@ -161,7 +161,7 @@ export default function ApiKeyManager() {
                       {t('installDescription')}
                     </p>
                     <div className="relative">
-                      <pre className="p-3 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                      <pre className="p-3 bg-gray-900 dark:bg-[#141926] text-gray-100 dark:text-gray-300 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
                         {getInstallCommand(newKey.key)}
                       </pre>
                       <Button
@@ -235,8 +235,8 @@ export default function ApiKeyManager() {
                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-accent gap-3"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-950 rounded-lg flex-shrink-0">
-                    <Key className="h-4 w-4 text-purple-600" />
+                  <div className="p-2 bg-purple-100 dark:bg-purple-950/50 rounded-lg flex-shrink-0">
+                    <Key className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">{apiKey.device_name}</div>
@@ -258,7 +258,7 @@ export default function ApiKeyManager() {
                     onClick={() => setInstallDialogKey(apiKey)}
                     title={t('installTitle')}
                   >
-                    <Terminal className="h-4 w-4 text-blue-600" />
+                    <Terminal className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </Button>
                   <Button
                     size="sm"
@@ -278,7 +278,7 @@ export default function ApiKeyManager() {
                     onClick={() => handleDeleteKey(apiKey.id)}
                     title={t('delete')}
                   >
-                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
                   </Button>
                 </div>
               </div>
@@ -301,7 +301,7 @@ export default function ApiKeyManager() {
               {t('installDescription')}
             </p>
             <div className="relative">
-              <pre className="p-3 bg-gray-900 text-gray-100 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
+              <pre className="p-3 bg-gray-900 dark:bg-[#141926] text-gray-100 dark:text-gray-300 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
                 {installDialogKey && getInstallCommand(installDialogKey.key)}
               </pre>
               <Button

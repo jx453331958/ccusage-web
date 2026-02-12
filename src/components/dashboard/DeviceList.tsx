@@ -40,8 +40,8 @@ export default function DeviceList({ devices }: DeviceListProps) {
                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-accent gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg flex-shrink-0">
-                    <Cpu className="h-5 w-5 text-blue-600" />
+                  <div className="p-2 bg-blue-100 dark:bg-blue-950/50 rounded-lg flex-shrink-0">
+                    <Cpu className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium truncate">{device.device_name}</div>

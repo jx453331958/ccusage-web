@@ -33,7 +33,7 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t('inputTokens')}</CardTitle>
-          <ArrowUpRight className="h-4 w-4 text-blue-600" />
+          <ArrowUpRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatNumber(stats.totalInput)}</div>
@@ -44,7 +44,7 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t('outputTokens')}</CardTitle>
-          <ArrowDownLeft className="h-4 w-4 text-green-600" />
+          <ArrowDownLeft className="h-4 w-4 text-green-600 dark:text-green-400" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatNumber(stats.totalOutput)}</div>

@@ -107,15 +107,15 @@ export default function SettingsClient({ user }: SettingsClientProps) {
             <CardContent>
               <div className="space-y-2">
                 <div>
-                  <Label className="text-sm text-slate-500">{t('settings.account.username')}</Label>
+                  <Label className="text-sm text-muted-foreground">{t('settings.account.username')}</Label>
                   <p className="text-lg font-medium">{user.username}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-slate-500">{t('settings.account.userId')}</Label>
+                  <Label className="text-sm text-muted-foreground">{t('settings.account.userId')}</Label>
                   <p className="text-lg font-medium">{user.id}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-slate-500">{t('settings.account.accountCreated')}</Label>
+                  <Label className="text-sm text-muted-foreground">{t('settings.account.accountCreated')}</Label>
                   <p className="text-lg font-medium">
                     {new Date(user.created_at * 1000).toLocaleDateString()}
                   </p>
@@ -154,7 +154,7 @@ export default function SettingsClient({ user }: SettingsClientProps) {
                     disabled={isLoading}
                     minLength={6}
                   />
-                  <p className="text-sm text-slate-500">{t('settings.password.minChars')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.password.minChars')}</p>
                 </div>
 
                 <div className="space-y-2">

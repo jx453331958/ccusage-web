@@ -49,10 +49,10 @@ const INTERVAL_OPTIONS: { value: Interval; labelKey: string }[] = [
   { value: '1d', labelKey: '1d' },
 ];
 
-// Color palette for models
+// Color palette for models (muted tones that work on both light and dark)
 const MODEL_COLORS = [
-  '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
-  '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#48b8d0',
+  '#6b8fd4', '#7ec08a', '#e0b850', '#d47272', '#7bb8d0',
+  '#4da87c', '#e08a5e', '#9870b0', '#d48ab0', '#58b4c4',
 ];
 
 function formatTime(timestamp: number, interval: string): string {
@@ -111,10 +111,10 @@ export default function UsageTrend({
       : trendData.filter((d) => d.input_tokens > 0 || d.output_tokens > 0 || d.total_tokens > 0);
     const timestamps = filteredData.map((d) => d.timestamp);
 
-    const textColor = isDark ? '#e5e7eb' : '#374151';
-    const tooltipBg = isDark ? '#1f2937' : '#fff';
-    const tooltipBorder = isDark ? '#374151' : '#e5e7eb';
-    const tooltipTextColor = isDark ? '#f3f4f6' : '#111827';
+    const textColor = isDark ? '#b0b8c8' : '#374151';
+    const tooltipBg = isDark ? '#1e2536' : '#fff';
+    const tooltipBorder = isDark ? '#2d3548' : '#e5e7eb';
+    const tooltipTextColor = isDark ? '#c8cdd8' : '#111827';
 
     return {
       darkMode: isDark,
@@ -161,7 +161,7 @@ export default function UsageTrend({
           formatter: (value: number) => formatNumber(value),
           color: textColor,
         },
-        splitLine: { lineStyle: { color: isDark ? '#374151' : '#e5e7eb' } },
+        splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
       },
       dataZoom: [
         {
@@ -183,21 +183,21 @@ export default function UsageTrend({
           type: 'line',
           data: filteredData.map((d) => d.input_tokens),
           smooth: true,
-          itemStyle: { color: '#3b82f6' },
+          itemStyle: { color: isDark ? '#6b9cf7' : '#3b82f6' },
         },
         {
           name: t('outputTokens'),
           type: 'line',
           data: filteredData.map((d) => d.output_tokens),
           smooth: true,
-          itemStyle: { color: '#10b981' },
+          itemStyle: { color: isDark ? '#4ec9a0' : '#10b981' },
         },
         {
           name: t('totalTokens'),
           type: 'line',
           data: filteredData.map((d) => d.total_tokens),
           smooth: true,
-          itemStyle: { color: '#8b5cf6' },
+          itemStyle: { color: isDark ? '#a78bfa' : '#8b5cf6' },
         },
       ],
     };
@@ -243,10 +243,10 @@ export default function UsageTrend({
       };
     });
 
-    const textColor = isDark ? '#e5e7eb' : '#374151';
-    const tooltipBg = isDark ? '#1f2937' : '#fff';
-    const tooltipBorder = isDark ? '#374151' : '#e5e7eb';
-    const tooltipTextColor = isDark ? '#f3f4f6' : '#111827';
+    const textColor = isDark ? '#b0b8c8' : '#374151';
+    const tooltipBg = isDark ? '#1e2536' : '#fff';
+    const tooltipBorder = isDark ? '#2d3548' : '#e5e7eb';
+    const tooltipTextColor = isDark ? '#c8cdd8' : '#111827';
 
     return {
       darkMode: isDark,
@@ -298,7 +298,7 @@ export default function UsageTrend({
           formatter: (value: number) => formatNumber(value),
           color: textColor,
         },
-        splitLine: { lineStyle: { color: isDark ? '#374151' : '#e5e7eb' } },
+        splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
       },
       dataZoom: [
         {

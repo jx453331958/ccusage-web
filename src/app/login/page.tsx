@@ -81,7 +81,7 @@ export default function LoginPage() {
                 required
               />
             </div>
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            {error && <div className="text-sm text-red-600 dark:text-red-400">{error}</div>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? t('signingIn') : t('signIn')}
             </Button>
