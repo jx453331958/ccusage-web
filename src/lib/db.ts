@@ -104,6 +104,7 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_usage_device ON usage_records(device_name);
     CREATE INDEX IF NOT EXISTS idx_usage_api_key ON usage_records(api_key_id);
     CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model);
+    CREATE INDEX IF NOT EXISTS idx_usage_dedup ON usage_records(device_name, timestamp, model, input_tokens, output_tokens, cache_create_tokens, cache_read_tokens);
   `);
 
   // Create default admin user if no users exist

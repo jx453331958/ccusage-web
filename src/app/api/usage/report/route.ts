@@ -23,26 +23,56 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDb();
-    // Insert records in a transaction
+
+    // Dedup check: (device_name, timestamp, model, input_tokens, output_tokens, cache_create_tokens, cache_read_tokens)
+    const checkExists = db.prepare(`
+      SELECT 1 FROM usage_records
+      WHERE device_name = ? AND timestamp = ? AND model = ?
+        AND input_tokens = ? AND output_tokens = ?
+        AND cache_create_tokens = ? AND cache_read_tokens = ?
+      LIMIT 1
+    `);
+
     const insert = db.prepare(`
       INSERT INTO usage_records (api_key_id, device_name, input_tokens, output_tokens, total_tokens, cache_create_tokens, cache_read_tokens, session_id, model, timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    let inserted = 0;
+    let skipped = 0;
+
     const insertMany = db.transaction((records: any[]) => {
       for (const record of records) {
+        const inputTokens = record.input_tokens || 0;
+        const outputTokens = record.output_tokens || 0;
+        const cacheCreate = record.cache_create_tokens || 0;
+        const cacheRead = record.cache_read_tokens || 0;
+        const model = record.model || 'unknown';
+        const timestamp = record.timestamp;
+
+        // Skip if duplicate
+        const exists = checkExists.get(
+          keyInfo.device_name, timestamp, model,
+          inputTokens, outputTokens, cacheCreate, cacheRead
+        );
+        if (exists) {
+          skipped++;
+          continue;
+        }
+
         insert.run(
           keyInfo.id,
           keyInfo.device_name,
-          record.input_tokens || 0,
-          record.output_tokens || 0,
+          inputTokens,
+          outputTokens,
           record.total_tokens || 0,
-          record.cache_create_tokens || 0,
-          record.cache_read_tokens || 0,
+          cacheCreate,
+          cacheRead,
           record.session_id || null,
-          record.model || 'unknown',
-          record.timestamp
+          model,
+          timestamp
         );
+        inserted++;
       }
     });
 
@@ -50,7 +80,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      inserted: records.length,
+      inserted,
+      skipped,
     });
   } catch (error) {
     console.error('Error reporting usage:', error);
