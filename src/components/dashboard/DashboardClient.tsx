@@ -220,8 +220,10 @@ export default function DashboardClient({ user }: { user: User }) {
                     <button
                       key={tab.id}
                       onClick={() => {
+                        const switchingToOverview = tab.id === 'overview' && activeTab !== 'overview';
                         setActiveTab(tab.id);
                         setTabDropdownOpen(false);
+                        if (switchingToOverview) fetchStats();
                       }}
                       className={cn(
                         "flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
@@ -413,7 +415,7 @@ export default function DashboardClient({ user }: { user: User }) {
                   </div>
                 )}
                 <div className="space-y-6">
-                  <StatsOverview stats={stats.totalStats} />
+                  <StatsOverview stats={stats.totalStats} modelStats={stats.modelStats} />
                   <UsageTrend
                     trendData={stats.trendData}
                     modelTrendData={stats.modelTrendData || []}

@@ -132,14 +132,26 @@ validate_interval() {
 }
 
 prompt_config() {
+    # Save env vars BEFORE loading config file, so env takes priority
+    local env_server="${CCUSAGE_SERVER:-}"
+    local env_key="${CCUSAGE_API_KEY:-}"
+    local env_interval="${REPORT_INTERVAL:-}"
+    local env_insecure="${CCUSAGE_INSECURE:-}"
+
     load_config
+
+    # Environment variables override config file values
+    if [[ -n "$env_server" ]]; then CCUSAGE_SERVER="$env_server"; fi
+    if [[ -n "$env_key" ]]; then CCUSAGE_API_KEY="$env_key"; fi
+    if [[ -n "$env_interval" ]]; then REPORT_INTERVAL="$env_interval"; fi
+    if [[ -n "$env_insecure" ]]; then CCUSAGE_INSECURE="$env_insecure"; fi
 
     # Set default report interval if not set
     REPORT_INTERVAL="${REPORT_INTERVAL:-5}"
 
     # Check if we already have config from environment or file
     if [[ -n "$CCUSAGE_SERVER" ]] && [[ -n "$CCUSAGE_API_KEY" ]]; then
-        log_info "Using existing configuration"
+        log_info "Using configuration"
         log_info "Server: $CCUSAGE_SERVER"
         log_info "Report interval: ${REPORT_INTERVAL} minutes"
         save_config
