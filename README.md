@@ -70,7 +70,6 @@ The script will:
 ./deploy.sh status   # Show status and recent logs
 ./deploy.sh logs     # Follow container logs
 ./deploy.sh backup   # Backup the database
-./deploy.sh reset-db # Clear all usage data (keeps users and API keys)
 ./deploy.sh clean    # Remove containers and images
 ```
 

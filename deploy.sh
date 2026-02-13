@@ -164,61 +164,6 @@ backup() {
     fi
 }
 
-# Reset usage data (clear usage_records table, keep users/api-keys/settings)
-reset_db() {
-    print_warn "This will DELETE all usage data (usage_records table)."
-    print_warn "Users, API keys, and settings will be preserved."
-    print_warn "Agents will need to re-report their data."
-    echo ""
-    read -p "Are you sure? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_info "Reset cancelled"
-        return
-    fi
-
-    # Backup database first
-    if [ -f data/ccusage.db ]; then
-        BACKUP_FILE="backup_before_reset_$(date +%Y%m%d_%H%M%S).db"
-        if cp data/ccusage.db "data/$BACKUP_FILE" 2>/dev/null; then
-            print_info "Database backed up to: data/$BACKUP_FILE"
-        elif sudo cp data/ccusage.db "data/$BACKUP_FILE"; then
-            print_info "Database backed up to: data/$BACKUP_FILE (via sudo)"
-        else
-            print_error "Failed to backup database"
-            exit 1
-        fi
-    fi
-
-    # Ensure service is running so we can exec into the container
-    if ! docker compose ps --status running | grep -q "ccusage-web"; then
-        print_info "Starting service..."
-        docker compose up -d
-        sleep 5
-    fi
-
-    # Clear usage_records via node inside the container
-    print_info "Clearing usage data..."
-    docker compose exec -T ccusage-web node -e "
-        const Database = require('better-sqlite3');
-        const db = new Database('/app/data/ccusage.db');
-        const count = db.prepare('SELECT COUNT(*) as c FROM usage_records').get();
-        db.exec('DELETE FROM usage_records');
-        db.exec('VACUUM');
-        db.close();
-        console.log('Deleted ' + count.c + ' records');
-    "
-
-    if [ $? -eq 0 ]; then
-        print_info "Usage data cleared successfully."
-        print_info "Users, API keys, and settings are preserved."
-        print_warn "Remember to run './setup.sh reset' on each agent to re-report all data."
-    else
-        print_error "Failed to clear usage data."
-        exit 1
-    fi
-}
-
 # Clean up (remove containers and images)
 clean() {
     print_warn "This will remove containers and images. Data in ./data will be preserved."
@@ -247,14 +192,12 @@ show_help() {
     echo "  status   - Show service status and recent logs"
     echo "  logs     - Follow container logs"
     echo "  backup   - Backup the database"
-    echo "  reset-db - Clear all usage data (keeps users and API keys)"
     echo "  clean    - Remove containers and images"
     echo "  help     - Show this help message"
     echo ""
     echo "Examples:"
     echo "  $0 deploy    # First-time setup"
     echo "  $0 update    # Update to latest version"
-    echo "  $0 reset-db  # Clear all data and start fresh"
     echo "  $0 logs      # View logs"
 }
 
@@ -284,9 +227,6 @@ case "${1:-}" in
         ;;
     backup)
         backup
-        ;;
-    reset-db)
-        reset_db
         ;;
     clean)
         clean

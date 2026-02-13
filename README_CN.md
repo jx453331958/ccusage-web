@@ -70,7 +70,6 @@ chmod +x deploy.sh
 ./deploy.sh status   # 查看状态和最近日志
 ./deploy.sh logs     # 查看实时日志
 ./deploy.sh backup   # 备份数据库
-./deploy.sh reset-db # 清空用量数据（保留用户和 API key）
 ./deploy.sh clean    # 删除容器和镜像
 ```
 
