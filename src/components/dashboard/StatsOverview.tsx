@@ -7,9 +7,7 @@ import { formatNumber } from '@/lib/utils';
 
 function formatCost(cost: number): string {
   if (cost >= 1000) return `$${(cost / 1000).toFixed(1)}K`;
-  if (cost >= 1) return `$${cost.toFixed(2)}`;
-  if (cost >= 0.01) return `$${cost.toFixed(2)}`;
-  return `$${cost.toFixed(4)}`;
+  return `$${cost.toFixed(2)}`;
 }
 
 interface StatsOverviewProps {

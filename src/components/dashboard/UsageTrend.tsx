@@ -83,10 +83,7 @@ function formatNumber(value: number): string {
 
 function formatCostValue(value: number): string {
   if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
-  if (value >= 1) return `$${value.toFixed(2)}`;
-  if (value >= 0.01) return `$${value.toFixed(2)}`;
-  if (value >= 0.001) return `$${value.toFixed(3)}`;
-  return `$${value.toFixed(4)}`;
+  return `$${value.toFixed(2)}`;
 }
 
 type ViewMode = 'total' | 'model';
