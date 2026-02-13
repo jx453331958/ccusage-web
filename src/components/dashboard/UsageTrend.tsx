@@ -121,7 +121,15 @@ export default function UsageTrend({
   const [modelMetric, setModelMetric] = useState<ModelMetric>('total_tokens');
   const [showZeroValues, setShowZeroValues] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const isDark = mounted && resolvedTheme === 'dark';
 
   // Get unique models
@@ -174,10 +182,10 @@ export default function UsageTrend({
         textStyle: { color: textColor },
       },
       grid: {
-        left: 60,
-        right: 70,
+        left: isMobile ? 40 : 60,
+        right: isMobile ? 45 : 70,
         top: 20,
-        bottom: 80,
+        bottom: isMobile ? 100 : 80,
       },
       xAxis: {
         type: 'category',
@@ -185,8 +193,9 @@ export default function UsageTrend({
         axisLabel: {
           formatter: (value: number) => formatTime(value, effectiveInterval),
           color: textColor,
-          rotate: timestamps.length > 20 ? 45 : 0,
-          interval: timestamps.length <= 31 ? 0 : 'auto',
+          rotate: isMobile || timestamps.length > 20 ? 45 : 0,
+          interval: timestamps.length <= 31 && !isMobile ? 0 : 'auto',
+          fontSize: isMobile ? 10 : 12,
         },
         axisTick: { alignWithLabel: true },
       },
@@ -196,6 +205,7 @@ export default function UsageTrend({
           axisLabel: {
             formatter: (value: number) => formatNumber(value),
             color: textColor,
+            fontSize: isMobile ? 10 : 12,
           },
           splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
         },
@@ -205,6 +215,7 @@ export default function UsageTrend({
           axisLabel: {
             formatter: (value: number) => formatCostValue(value),
             color: isDark ? '#fbbf24' : '#d97706',
+            fontSize: isMobile ? 10 : 12,
           },
           splitLine: { show: false },
         },
@@ -219,7 +230,7 @@ export default function UsageTrend({
           type: 'slider',
           start: 0,
           end: 100,
-          bottom: 30,
+          bottom: isMobile ? 50 : 30,
           textStyle: { color: textColor },
         },
       ],
@@ -287,7 +298,7 @@ export default function UsageTrend({
         },
       ],
     };
-  }, [trendData, effectiveInterval, t, showZeroValues, isDark]);
+  }, [trendData, effectiveInterval, t, showZeroValues, isDark, isMobile]);
 
   // Build chart options for model view
   const modelChartOption = useMemo(() => {
@@ -371,10 +382,10 @@ export default function UsageTrend({
         textStyle: { color: textColor },
       },
       grid: {
-        left: 60,
-        right: 20,
+        left: isMobile ? 40 : 60,
+        right: isMobile ? 10 : 20,
         top: 20,
-        bottom: 80,
+        bottom: isMobile ? 100 : 80,
       },
       xAxis: {
         type: 'category',
@@ -382,8 +393,9 @@ export default function UsageTrend({
         axisLabel: {
           formatter: (value: number) => formatTime(value, effectiveInterval),
           color: textColor,
-          rotate: timestamps.length > 20 ? 45 : 0,
-          interval: timestamps.length <= 31 ? 0 : 'auto',
+          rotate: isMobile || timestamps.length > 20 ? 45 : 0,
+          interval: timestamps.length <= 31 && !isMobile ? 0 : 'auto',
+          fontSize: isMobile ? 10 : 12,
         },
         axisTick: { alignWithLabel: true },
       },
@@ -392,6 +404,7 @@ export default function UsageTrend({
         axisLabel: {
           formatter: (value: number) => valueFormatter(value),
           color: textColor,
+          fontSize: isMobile ? 10 : 12,
         },
         splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
       },
@@ -405,13 +418,13 @@ export default function UsageTrend({
           type: 'slider',
           start: 0,
           end: 100,
-          bottom: 30,
+          bottom: isMobile ? 50 : 30,
           textStyle: { color: textColor },
         },
       ],
       series,
     };
-  }, [modelTrendData, models, modelMetric, effectiveInterval, t, showZeroValues, isDark]);
+  }, [modelTrendData, models, modelMetric, effectiveInterval, t, showZeroValues, isDark, isMobile]);
 
   const chartOption = viewMode === 'total' ? totalChartOption : modelChartOption;
 
@@ -423,7 +436,7 @@ export default function UsageTrend({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle>{t('title')}</CardTitle>
             {/* Desktop: inline view mode + show zero */}
-            <div className="hidden sm:flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-3 flex-wrap">
               <div className="flex gap-1.5">
                 <Button
                   size="sm"
@@ -443,7 +456,7 @@ export default function UsageTrend({
               {viewMode === 'model' && (
                 <>
                   <div className="h-5 w-px bg-border" />
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
                     {MODEL_METRIC_OPTIONS.map((option) => (
                       <Button
                         key={option.value}
