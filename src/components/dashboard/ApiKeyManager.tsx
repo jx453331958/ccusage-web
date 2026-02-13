@@ -158,7 +158,7 @@ export default function ApiKeyManager() {
             <CardTitle>{t('title')}</CardTitle>
             <CardDescription>{t('description')}</CardDescription>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (open) { setNewKey(null); setDeviceName(''); } }}>
             <DialogTrigger asChild>
               <Button className="w-full sm:w-auto">
                 <Key className="h-4 w-4 mr-2" />
