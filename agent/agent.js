@@ -352,13 +352,10 @@ function createFetchOptions(options) {
   return fetchOptions;
 }
 
-// Report usage to server
-async function reportUsage(records) {
-  if (records.length === 0) {
-    console.log('No new records to report');
-    return;
-  }
+const BATCH_SIZE = 500;
 
+// Send a single batch of records to the server
+async function sendBatch(batch, url) {
   try {
     const fetchOptions = createFetchOptions({
       method: 'POST',
@@ -367,7 +364,7 @@ async function reportUsage(records) {
         Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify({
-        records: records.map((r) => ({
+        records: batch.map((r) => ({
           input_tokens: r.input_tokens,
           output_tokens: r.output_tokens,
           total_tokens: r.total_tokens,
@@ -380,25 +377,58 @@ async function reportUsage(records) {
       }),
     });
 
-    const response = await fetch(`${config.server}/api/usage/report`, fetchOptions);
+    const response = await fetch(url, fetchOptions);
 
     if (response.ok) {
       const data = await response.json();
-      console.log(`✓ Reported ${data.inserted} records successfully`);
+      console.log(`  ✓ Batch OK: ${data.inserted} inserted, ${data.skipped} skipped`);
 
       // Mark records as reported
-      records.forEach((r) => {
+      batch.forEach((r) => {
         state.reportedRecords.add(r._recordId);
       });
       state.lastReportedTimestamp = Math.floor(Date.now() / 1000);
       saveState();
+      return true;
     } else {
       const error = await response.text();
-      console.error(`✗ Failed to report usage: ${response.status} ${error}`);
+      console.error(`  ✗ Batch failed: ${response.status} ${error}`);
+      return false;
     }
   } catch (error) {
-    console.error(`✗ Network error:`, error.message);
+    console.error(`  ✗ Network error:`, error.message);
+    return false;
   }
+}
+
+// Report usage to server in batches
+async function reportUsage(records) {
+  if (records.length === 0) {
+    console.log('No new records to report');
+    return true;
+  }
+
+  const url = `${config.server}/api/usage/report`;
+  const total = records.length;
+  const totalBatches = Math.ceil(total / BATCH_SIZE);
+  let allOk = true;
+
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    const batch = records.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    console.log(`Reporting batch ${batchNum}/${totalBatches} (${batch.length} records)...`);
+    if (!await sendBatch(batch, url)) {
+      allOk = false;
+      console.log('  Stopping due to error (remaining records will be retried next run)');
+      break;
+    }
+  }
+
+  if (allOk) {
+    console.log(`✓ All ${total} records reported successfully`);
+  }
+
+  return allOk;
 }
 
 // Main monitoring loop
@@ -433,18 +463,19 @@ async function run() {
 
     console.log(`Collected ${allRecords.length} new records`);
 
-    await reportUsage(allRecords);
+    const success = await reportUsage(allRecords);
 
     console.log('---');
+    return success;
   }
 
   // Initial collection
-  await collect();
+  const success = await collect();
 
   // If --once, exit after first run
   if (runOnce) {
     saveState();
-    process.exit(0);
+    process.exit(success ? 0 : 1);
   }
 
   // Schedule periodic collection

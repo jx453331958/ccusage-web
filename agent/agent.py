@@ -264,15 +264,8 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
     return records
 
 
-def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
-    """Report usage records to the server."""
-    if not records:
-        print('No new records to report')
-        return True
-
-    server = config['server'].rstrip('/')
-    url = f"{server}/api/usage/report"
-
+def _send_batch(batch: List[Dict], url: str, config: Dict, state: State) -> bool:
+    """Send a single batch of records to the server."""
     payload = {
         'records': [
             {
@@ -285,7 +278,7 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
                 'model': r['model'],
                 'timestamp': r['timestamp'],
             }
-            for r in records
+            for r in batch
         ]
     }
 
@@ -311,47 +304,77 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
 
         with urlopen(request, timeout=30, context=ssl_context) as response:
             result = json.loads(response.read().decode('utf-8'))
-            print(f"✓ Reported {result.get('inserted', len(records))} records successfully")
+            inserted = result.get('inserted', len(batch))
+            skipped = result.get('skipped', 0)
+            print(f"  ✓ Batch OK: {inserted} inserted, {skipped} skipped")
 
             # Mark records as reported
-            for r in records:
+            for r in batch:
                 state.mark_reported(r['_record_id'])
             state.save()
             return True
 
     except HTTPError as e:
         error_body = e.read().decode('utf-8') if e.fp else ''
-        print(f'✗ Failed to report usage: {e.code} {error_body}', file=sys.stderr)
+        print(f'  ✗ Batch failed: {e.code} {error_body}', file=sys.stderr)
         return False
     except URLError as e:
-        print(f'✗ Network error: {e.reason}', file=sys.stderr)
+        print(f'  ✗ Network error: {e.reason}', file=sys.stderr)
         return False
     except Exception as e:
-        print(f'✗ Error: {e}', file=sys.stderr)
+        print(f'  ✗ Error: {e}', file=sys.stderr)
         return False
 
 
-def collect_and_report(config: Dict, state: State, quiet: bool = False):
-    """Collect usage data and report to server."""
-    if not quiet:
-        print(f'[{time.strftime("%H:%M:%S")}] Collecting usage data...')
+BATCH_SIZE = 500
+
+
+def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
+    """Report usage records to the server in batches."""
+    if not records:
+        print('No new records to report')
+        return True
+
+    server = config['server'].rstrip('/')
+    url = f"{server}/api/usage/report"
+
+    total = len(records)
+    all_ok = True
+
+    for i in range(0, total, BATCH_SIZE):
+        batch = records[i:i + BATCH_SIZE]
+        batch_num = i // BATCH_SIZE + 1
+        total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
+        print(f'Reporting batch {batch_num}/{total_batches} ({len(batch)} records)...')
+        if not _send_batch(batch, url, config, state):
+            all_ok = False
+            print(f'  Stopping due to error (remaining records will be retried next run)')
+            break
+
+    if all_ok:
+        print(f'✓ All {total} records reported successfully')
+
+    return all_ok
+
+
+def collect_and_report(config: Dict, state: State) -> bool:
+    """Collect usage data and report to server. Returns True on success."""
+    print(f'[{time.strftime("%H:%M:%S")}] Collecting usage data...')
 
     files = find_jsonl_files(config['claude_projects_dir'])
-    if not quiet:
-        print(f'Found {len(files)} JSONL files')
+    print(f'Found {len(files)} JSONL files')
 
     all_records = []
     for file_path in files:
         records = parse_jsonl_file(file_path, state)
         all_records.extend(records)
 
-    if not quiet:
-        print(f'Collected {len(all_records)} new records')
+    print(f'Collected {len(all_records)} new records')
 
-    report_usage(all_records, config, state)
+    success = report_usage(all_records, config, state)
 
-    if not quiet:
-        print('---')
+    print('---')
+    return success
 
 
 def main():
@@ -434,11 +457,11 @@ Examples:
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Initial collection
-    collect_and_report(config, state)
+    success = collect_and_report(config, state)
 
     if args.once:
         state.save()
-        sys.exit(0)
+        sys.exit(0 if success else 1)
 
     # Periodic collection
     interval_seconds = config['report_interval'] * 60
