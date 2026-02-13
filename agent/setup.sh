@@ -464,15 +464,13 @@ cmd_install() {
     log_info "Installation complete!"
     log_info "The agent will now run in the background and report usage every ${REPORT_INTERVAL} minute(s)."
 
-    # For cron mode, run once immediately since cron only triggers on schedule
-    # For launchd/systemd, the service starts immediately and reports on startup
-    if [[ "$os" != "macos" ]] && ! systemctl --user status >/dev/null 2>&1; then
-        log_info "Running initial data report..."
-        if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
-            log_info "Initial data report completed successfully"
-        else
-            log_warn "Initial data report failed (cron will retry on next schedule)"
-        fi
+    # Run once immediately so user gets instant feedback in terminal
+    # Server-side dedup ensures no duplicate records even if the background service also reports
+    log_info "Running initial data report..."
+    if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
+        log_info "Initial data report completed successfully"
+    else
+        log_warn "Initial data report failed (the background service will retry automatically)"
     fi
 }
 
