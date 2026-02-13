@@ -41,14 +41,23 @@ export async function POST(request: NextRequest) {
     let inserted = 0;
     let skipped = 0;
 
+    let invalidCount = 0;
+
     const insertMany = db.transaction((records: any[]) => {
       for (const record of records) {
+        const timestamp = record.timestamp;
+
+        // Skip records missing required timestamp
+        if (timestamp == null) {
+          invalidCount++;
+          continue;
+        }
+
         const inputTokens = record.input_tokens || 0;
         const outputTokens = record.output_tokens || 0;
         const cacheCreate = record.cache_create_tokens || 0;
         const cacheRead = record.cache_read_tokens || 0;
         const model = record.model || 'unknown';
-        const timestamp = record.timestamp;
 
         // Skip if duplicate
         const exists = checkExists.get(
@@ -82,6 +91,7 @@ export async function POST(request: NextRequest) {
       success: true,
       inserted,
       skipped,
+      ...(invalidCount > 0 && { invalid: invalidCount }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
