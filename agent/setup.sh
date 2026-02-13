@@ -250,7 +250,14 @@ install_macos() {
 </plist>
 EOF
 
-    launchctl unload "$plist_path" 2>/dev/null || true
+    # Check and report existing service status
+    if launchctl list 2>/dev/null | grep -q "com.ccusage.agent"; then
+        log_info "Stopping existing LaunchAgent service..."
+        launchctl unload "$plist_path" 2>/dev/null || true
+        log_info "Existing LaunchAgent service stopped"
+    else
+        launchctl unload "$plist_path" 2>/dev/null || true
+    fi
     launchctl load "$plist_path"
 
     log_info "LaunchAgent installed: $plist_path"
@@ -320,6 +327,14 @@ WantedBy=default.target
 EOF
 
     systemctl --user daemon-reload
+
+    # Check and report existing service status
+    if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        log_info "Stopping existing systemd service..."
+        systemctl --user stop "$SERVICE_NAME" 2>/dev/null || true
+        log_info "Existing systemd service stopped"
+    fi
+
     systemctl --user enable "$SERVICE_NAME"
     systemctl --user start "$SERVICE_NAME"
 
@@ -386,6 +401,11 @@ install_cron() {
 
     local cron_cmd="$cron_schedule CCUSAGE_SERVER=\"$CCUSAGE_SERVER\" CCUSAGE_API_KEY=\"$CCUSAGE_API_KEY\" CCUSAGE_INSECURE=\"${CCUSAGE_INSECURE:-false}\" $RUNTIME_PATH $AGENT_SCRIPT --once >> /tmp/ccusage-agent.log 2>&1"
 
+    # Check and report existing cron job
+    if crontab -l 2>/dev/null | grep -q "ccusage-agent\|$AGENT_SCRIPT"; then
+        log_info "Removing existing cron job..."
+    fi
+
     # Remove existing entry and add new one
     (crontab -l 2>/dev/null | grep -v "ccusage-agent\|$AGENT_SCRIPT"; echo "$cron_cmd") | crontab -
 
@@ -443,6 +463,17 @@ cmd_install() {
     echo ""
     log_info "Installation complete!"
     log_info "The agent will now run in the background and report usage every ${REPORT_INTERVAL} minute(s)."
+
+    # For cron mode, run once immediately since cron only triggers on schedule
+    # For launchd/systemd, the service starts immediately and reports on startup
+    if [[ "$os" != "macos" ]] && ! systemctl --user status >/dev/null 2>&1; then
+        log_info "Running initial data report..."
+        if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
+            log_info "Initial data report completed successfully"
+        else
+            log_warn "Initial data report failed (cron will retry on next schedule)"
+        fi
+    fi
 }
 
 cmd_uninstall() {
