@@ -121,7 +121,8 @@ export default function UsageTrend({
   const [viewMode, setViewMode] = useState<ViewMode>('total');
   const [modelMetric, setModelMetric] = useState<ModelMetric>('total_tokens');
   const [showZeroValues, setShowZeroValues] = useState(false);
-  const [intervalOpen, setIntervalOpen] = useState(false);
+  const [intervalOpenDesktop, setIntervalOpenDesktop] = useState(false);
+  const [intervalOpenMobile, setIntervalOpenMobile] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -476,7 +477,7 @@ export default function UsageTrend({
                 </>
               )}
               <div className="h-5 w-px bg-border" />
-              <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
+              <Popover open={intervalOpenDesktop} onOpenChange={setIntervalOpenDesktop}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1.5">
                     <span className="text-muted-foreground text-xs">{t('intervalLabel')}:</span>
@@ -489,7 +490,7 @@ export default function UsageTrend({
                     {INTERVAL_OPTIONS.map((option) => (
                       <button
                         key={option.value}
-                        onClick={() => { onIntervalChange(option.value); setIntervalOpen(false); }}
+                        onClick={() => { onIntervalChange(option.value); setIntervalOpenDesktop(false); }}
                         className={cn(
                           'px-3 py-1.5 text-sm rounded-md transition-colors text-center',
                           interval === option.value
@@ -567,7 +568,7 @@ export default function UsageTrend({
 
           {/* Mobile: interval dropdown + show zero toggle */}
           <div className="sm:hidden flex items-center justify-between">
-            <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
+            <Popover open={intervalOpenMobile} onOpenChange={setIntervalOpenMobile}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5">
                   <span className="text-muted-foreground text-xs">{t('intervalLabel')}:</span>
@@ -580,7 +581,7 @@ export default function UsageTrend({
                   {INTERVAL_OPTIONS.map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => { onIntervalChange(option.value); setIntervalOpen(false); }}
+                      onClick={() => { onIntervalChange(option.value); setIntervalOpenMobile(false); }}
                       className={cn(
                         'px-3 py-1.5 text-sm rounded-md transition-colors text-center',
                         interval === option.value
