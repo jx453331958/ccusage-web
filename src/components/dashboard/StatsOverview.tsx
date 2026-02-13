@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpRight, ArrowDownLeft, Activity, DollarSign, Database, BookOpen, Info } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Activity, DollarSign, Database, BookOpen } from 'lucide-react';
 import { formatNumber, formatNumberExact } from '@/lib/utils';
 
 function formatCost(cost: number): string {
@@ -12,7 +12,6 @@ function formatCost(cost: number): string {
 }
 
 function formatModelName(model: string): string {
-  // Shorten long model names for display
   return model
     .replace('claude-', '')
     .replace(/-\d{8}$/, '');
@@ -42,41 +41,6 @@ interface StatsOverviewProps {
   modelStats?: ModelStat[];
 }
 
-function DetailBubble({
-  modelStats,
-  field,
-  formatter,
-}: {
-  modelStats: ModelStat[];
-  field: keyof ModelStat;
-  formatter: (v: number) => string;
-}) {
-  if (!modelStats || modelStats.length === 0) return null;
-
-  // Sort by value descending
-  const sorted = [...modelStats]
-    .map(m => ({ model: m.model, value: m[field] as number }))
-    .filter(m => m.value > 0)
-    .sort((a, b) => b.value - a.value);
-
-  if (sorted.length === 0) return null;
-
-  return (
-    <div className="space-y-1.5">
-      {sorted.map(item => (
-        <div key={item.model} className="flex items-center justify-between gap-3">
-          <span className="text-xs text-muted-foreground truncate max-w-[140px]" title={item.model}>
-            {formatModelName(item.model)}
-          </span>
-          <span className="text-xs font-medium tabular-nums whitespace-nowrap">
-            {formatter(item.value)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function StatCard({
   title,
   value,
@@ -96,44 +60,68 @@ function StatCard({
   field: keyof ModelStat;
   formatter: (v: number) => string;
 }) {
-  const [showDetail, setShowDetail] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
   const hasDetail = modelStats && modelStats.length > 0;
 
+  const sorted = hasDetail
+    ? [...modelStats]
+        .map(m => ({ model: m.model, value: m[field] as number }))
+        .filter(m => m.value > 0)
+        .sort((a, b) => b.value - a.value)
+    : [];
+
+  const handleEnter = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setHovered(true);
+  }, []);
+
+  const handleLeave = useCallback(() => {
+    timerRef.current = setTimeout(() => setHovered(false), 100);
+  }, []);
+
+  const showDetail = hovered && sorted.length > 0;
+
   return (
-    <Card className="min-w-0 overflow-visible relative">
+    <Card
+      className="min-w-0 overflow-hidden relative cursor-default"
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="flex items-center gap-1">
-          {hasDetail && (
-            <button
-              className="p-0.5 rounded-sm text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-              onMouseEnter={() => setShowDetail(true)}
-              onMouseLeave={() => setShowDetail(false)}
-              onClick={() => setShowDetail(!showDetail)}
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {icon}
-        </div>
+        {icon}
       </CardHeader>
-      <CardContent>
-        <div className="text-xl xl:text-lg 2xl:text-2xl font-bold truncate" title={formattedValue}>{value}</div>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
-      </CardContent>
-
-      {/* Detail bubble */}
-      {hasDetail && showDetail && (
-        <div
-          className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 w-64 p-3 rounded-lg border bg-popover text-popover-foreground shadow-lg"
-          onMouseEnter={() => setShowDetail(true)}
-          onMouseLeave={() => setShowDetail(false)}
-        >
-          {/* Arrow */}
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 border-l border-t bg-popover" />
-          <DetailBubble modelStats={modelStats!} field={field} formatter={formatter} />
+      <CardContent className="relative">
+        {/* Main value - always visible, fades when detail shown */}
+        <div className={`transition-opacity duration-200 ${showDetail ? 'opacity-0' : 'opacity-100'}`}>
+          <div className="text-xl xl:text-lg 2xl:text-2xl font-bold truncate" title={formattedValue}>{value}</div>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
-      )}
+
+        {/* Detail overlay - positioned on top of main value */}
+        {sorted.length > 0 && (
+          <div
+            className={`absolute inset-0 px-6 pb-6 flex flex-col justify-center transition-opacity duration-200 ${
+              showDetail ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+          >
+            <div className="space-y-1">
+              {sorted.map(item => (
+                <div key={item.model} className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-muted-foreground truncate" title={item.model}>
+                    {formatModelName(item.model)}
+                  </span>
+                  <span className="text-[11px] font-semibold tabular-nums whitespace-nowrap">
+                    {formatter(item.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
