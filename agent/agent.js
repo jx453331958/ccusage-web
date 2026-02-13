@@ -287,11 +287,13 @@ function parseTimestamp(ts) {
 }
 
 // Parse JSONL file and extract usage records
-// Deduplicates by message ID: each API request may have multiple JSONL entries
-// (streaming chunks), but we only keep the last entry per message ID.
+// Deduplicates by message.id:requestId (matching ccusage CLI logic):
+// each API request generates multiple streaming content block entries
+// with the same message.id and requestId. We keep only the first entry
+// per unique key to avoid over-counting.
 function parseJsonlFile(filePath) {
-  // First pass: collect entries grouped by message ID
-  const msgMap = new Map(); // msgId -> best record data
+  // First pass: collect entries grouped by dedup key (message.id:requestId)
+  const msgMap = new Map(); // dedupKey -> record data
 
   try {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -314,8 +316,13 @@ function parseJsonlFile(filePath) {
 
         const timestamp = parseTimestamp(entry.timestamp);
 
-        // Use message ID for dedup; fall back to content-based key
-        const msgId = entry.message?.id || `${filePath}:${timestamp}:${inputTokens}:${outputTokens}:${cacheCreateTokens}:${cacheReadTokens}`;
+        // Dedup key: message.id:requestId (matching ccusage CLI logic)
+        // If either field is missing, use a content-based fallback key
+        const messageId = entry.message?.id;
+        const requestId = entry.requestId;
+        const msgId = (messageId && requestId)
+          ? `${messageId}:${requestId}`
+          : `${filePath}:${timestamp}:${inputTokens}:${outputTokens}:${cacheCreateTokens}:${cacheReadTokens}`;
 
         const recordData = {
           input_tokens: inputTokens,

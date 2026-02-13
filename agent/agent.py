@@ -210,12 +210,13 @@ def _parse_timestamp(timestamp_val) -> int:
 def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
     """Parse a JSONL file and extract usage records.
 
-    Deduplicates by message ID: each API request (message) may have multiple
-    JSONL entries (streaming chunks), but we only keep the last entry per
-    message ID to avoid over-counting.
+    Deduplicates by message.id:requestId (matching ccusage CLI logic):
+    each API request generates multiple streaming content block entries
+    with the same message.id and requestId. We keep only the first entry
+    per unique key to avoid over-counting.
     """
-    # First pass: collect entries grouped by message ID
-    msg_map = {}  # msg_id -> best entry data (last/largest output)
+    # First pass: collect entries grouped by dedup key (message.id:requestId)
+    msg_map = {}  # dedup_key -> record data
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -242,11 +243,15 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
 
                     timestamp = _parse_timestamp(entry.get('timestamp'))
 
-                    # Use message ID for dedup; fall back to a unique key if not present
+                    # Dedup key: message.id:requestId (matching ccusage CLI logic)
+                    # If either field is missing, use a content-based fallback key
                     msg = entry.get('message', {})
-                    msg_id = msg.get('id')
-                    if not msg_id:
-                        # No message ID - use content-based key
+                    message_id = msg.get('id')
+                    request_id = entry.get('requestId')
+                    if message_id and request_id:
+                        msg_id = f'{message_id}:{request_id}'
+                    else:
+                        # No dedup possible - use content-based key so each entry is unique
                         msg_id = f'{file_path}:{timestamp}:{input_tokens}:{output_tokens}:{cache_create_tokens}:{cache_read_tokens}'
 
                     record_data = {
