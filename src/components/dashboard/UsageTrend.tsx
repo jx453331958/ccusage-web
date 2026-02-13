@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -421,12 +421,7 @@ export default function UsageTrend({
         <div className="flex flex-col gap-3">
           {/* Title + desktop controls */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="space-y-1">
-              <CardTitle>{t('title')}</CardTitle>
-              <CardDescription>
-                {t('description')} · {t('currentInterval')}: {t(`interval.${effectiveInterval}`)}
-              </CardDescription>
-            </div>
+            <CardTitle>{t('title')}</CardTitle>
             {/* Desktop: inline view mode + show zero */}
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex gap-1.5">
