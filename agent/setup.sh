@@ -258,6 +258,15 @@ EOF
     else
         launchctl unload "$plist_path" 2>/dev/null || true
     fi
+
+    # Run once immediately before starting service, so user sees output in terminal
+    log_info "Running initial data report..."
+    if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
+        log_info "Initial data report completed successfully"
+    else
+        log_warn "Initial data report failed (the background service will retry automatically)"
+    fi
+
     launchctl load "$plist_path"
 
     log_info "LaunchAgent installed: $plist_path"
@@ -335,6 +344,14 @@ EOF
         log_info "Existing systemd service stopped"
     fi
 
+    # Run once immediately before starting service, so user sees output in terminal
+    log_info "Running initial data report..."
+    if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
+        log_info "Initial data report completed successfully"
+    else
+        log_warn "Initial data report failed (the background service will retry automatically)"
+    fi
+
     systemctl --user enable "$SERVICE_NAME"
     systemctl --user start "$SERVICE_NAME"
 
@@ -406,6 +423,14 @@ install_cron() {
         log_info "Removing existing cron job..."
     fi
 
+    # Run once immediately before installing cron, so user sees output in terminal
+    log_info "Running initial data report..."
+    if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
+        log_info "Initial data report completed successfully"
+    else
+        log_warn "Initial data report failed (cron will retry on next schedule)"
+    fi
+
     # Remove existing entry and add new one
     (crontab -l 2>/dev/null | grep -v "ccusage-agent\|$AGENT_SCRIPT"; echo "$cron_cmd") | crontab -
 
@@ -463,15 +488,6 @@ cmd_install() {
     echo ""
     log_info "Installation complete!"
     log_info "The agent will now run in the background and report usage every ${REPORT_INTERVAL} minute(s)."
-
-    # Run once immediately so user gets instant feedback in terminal
-    # Server-side dedup ensures no duplicate records even if the background service also reports
-    log_info "Running initial data report..."
-    if CCUSAGE_SERVER="$CCUSAGE_SERVER" CCUSAGE_API_KEY="$CCUSAGE_API_KEY" CCUSAGE_INSECURE="${CCUSAGE_INSECURE:-false}" "$RUNTIME_PATH" "$AGENT_SCRIPT" --once 2>&1; then
-        log_info "Initial data report completed successfully"
-    else
-        log_warn "Initial data report failed (the background service will retry automatically)"
-    fi
 }
 
 cmd_uninstall() {
