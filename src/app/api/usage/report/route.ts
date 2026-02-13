@@ -40,24 +40,24 @@ export async function POST(request: NextRequest) {
 
     let inserted = 0;
     let skipped = 0;
+    let invalid = 0;
 
-    let invalidCount = 0;
-
-    const insertMany = db.transaction((records: any[]) => {
-      for (const record of records) {
-        const timestamp = record.timestamp;
-
-        // Skip records missing required timestamp
+    // Process each record individually - don't let one bad record kill the whole batch
+    for (const record of records) {
+      try {
+        const timestamp = record.timestamp ?? null;
         if (timestamp == null) {
-          invalidCount++;
+          invalid++;
           continue;
         }
 
-        const inputTokens = record.input_tokens || 0;
-        const outputTokens = record.output_tokens || 0;
-        const cacheCreate = record.cache_create_tokens || 0;
-        const cacheRead = record.cache_read_tokens || 0;
-        const model = record.model || 'unknown';
+        const inputTokens = Number(record.input_tokens) || 0;
+        const outputTokens = Number(record.output_tokens) || 0;
+        const totalTokens = Number(record.total_tokens) || 0;
+        const cacheCreate = Number(record.cache_create_tokens) || 0;
+        const cacheRead = Number(record.cache_read_tokens) || 0;
+        const model = String(record.model || 'unknown');
+        const sessionId = record.session_id != null ? String(record.session_id) : null;
 
         // Skip if duplicate
         const exists = checkExists.get(
@@ -74,24 +74,25 @@ export async function POST(request: NextRequest) {
           keyInfo.device_name,
           inputTokens,
           outputTokens,
-          record.total_tokens || 0,
+          totalTokens,
           cacheCreate,
           cacheRead,
-          record.session_id || null,
+          sessionId,
           model,
           timestamp
         );
         inserted++;
+      } catch (recordError) {
+        console.error('Skipping bad record:', recordError instanceof Error ? recordError.message : recordError, JSON.stringify(record).slice(0, 200));
+        invalid++;
       }
-    });
-
-    insertMany(records);
+    }
 
     return NextResponse.json({
       success: true,
       inserted,
       skipped,
-      ...(invalidCount > 0 && { invalid: invalidCount }),
+      ...(invalid > 0 && { invalid }),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
