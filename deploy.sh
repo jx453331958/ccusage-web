@@ -55,6 +55,31 @@ init_env() {
     fi
 }
 
+# Load .env file variables
+load_env() {
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+    fi
+}
+
+# Get host IP address
+get_host_ip() {
+    # Try common methods to get the primary IP
+    local ip=""
+    if command -v hostname &> /dev/null; then
+        ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    if [ -z "$ip" ] && command -v ip &> /dev/null; then
+        ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}')
+    fi
+    if [ -z "$ip" ]; then
+        ip=$(ifconfig 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}')
+    fi
+    echo "${ip:-localhost}"
+}
+
 # Create data directory
 init_data_dir() {
     if [ ! -d data ]; then
@@ -70,6 +95,7 @@ deploy() {
 
     check_docker
     init_env
+    load_env
     init_data_dir
 
     print_info "Pulling latest image..."
@@ -83,11 +109,13 @@ deploy() {
 
     # Check if service is running
     if docker compose ps | grep -q "Up"; then
+        local host_ip=$(get_host_ip)
+        local port="${PORT:-3000}"
         print_info "Deployment successful!"
         echo ""
         echo -e "${GREEN}========================================${NC}"
         echo -e "${GREEN}  CCUsage Web is now running!${NC}"
-        echo -e "${GREEN}  Access: http://localhost:${PORT:-3000}${NC}"
+        echo -e "${GREEN}  Access: http://${host_ip}:${port}${NC}"
         echo -e "${GREEN}========================================${NC}"
     else
         print_error "Deployment failed. Check logs with: docker compose logs"
