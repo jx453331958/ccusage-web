@@ -164,10 +164,11 @@ backup() {
     fi
 }
 
-# Reset database (stop service, backup and remove db, restart)
+# Reset usage data (clear usage_records table, keep users/api-keys/settings)
 reset_db() {
-    print_warn "This will STOP the service, backup the current database, DELETE it, and restart."
-    print_warn "All usage data will be lost. Agents will need to re-report their data."
+    print_warn "This will DELETE all usage data (usage_records table)."
+    print_warn "Users, API keys, and settings will be preserved."
+    print_warn "Agents will need to re-report their data."
     echo ""
     read -p "Are you sure? (y/N) " -n 1 -r
     echo
@@ -176,11 +177,7 @@ reset_db() {
         return
     fi
 
-    # Stop service first
-    print_info "Stopping service..."
-    docker compose down
-
-    # Backup existing database
+    # Backup database first
     if [ -f data/ccusage.db ]; then
         BACKUP_FILE="backup_before_reset_$(date +%Y%m%d_%H%M%S).db"
         if cp data/ccusage.db "data/$BACKUP_FILE" 2>/dev/null; then
@@ -191,31 +188,33 @@ reset_db() {
             print_error "Failed to backup database"
             exit 1
         fi
-
-        # Remove database files
-        if rm -f data/ccusage.db data/ccusage.db-wal data/ccusage.db-shm 2>/dev/null; then
-            print_info "Database deleted"
-        elif sudo rm -f data/ccusage.db data/ccusage.db-wal data/ccusage.db-shm; then
-            print_info "Database deleted (via sudo)"
-        else
-            print_error "Failed to delete database"
-            exit 1
-        fi
-    else
-        print_warn "No database file found"
     fi
 
-    # Restart service (will auto-create a fresh database)
-    print_info "Starting service with fresh database..."
-    docker compose up -d
+    # Ensure service is running so we can exec into the container
+    if ! docker compose ps --status running | grep -q "ccusage-web"; then
+        print_info "Starting service..."
+        docker compose up -d
+        sleep 5
+    fi
 
-    sleep 5
+    # Clear usage_records via node inside the container
+    print_info "Clearing usage data..."
+    docker compose exec -T ccusage-web node -e "
+        const Database = require('better-sqlite3');
+        const db = new Database('/app/data/ccusage.db');
+        const count = db.prepare('SELECT COUNT(*) as c FROM usage_records').get();
+        db.exec('DELETE FROM usage_records');
+        db.exec('VACUUM');
+        db.close();
+        console.log('Deleted ' + count.c + ' records');
+    "
 
-    if docker compose ps | grep -q "Up"; then
-        print_info "Reset complete! Service is running with a fresh database."
+    if [ $? -eq 0 ]; then
+        print_info "Usage data cleared successfully."
+        print_info "Users, API keys, and settings are preserved."
         print_warn "Remember to run './setup.sh reset' on each agent to re-report all data."
     else
-        print_error "Service failed to start. Check logs with: docker compose logs"
+        print_error "Failed to clear usage data."
         exit 1
     fi
 }
@@ -248,7 +247,7 @@ show_help() {
     echo "  status   - Show service status and recent logs"
     echo "  logs     - Follow container logs"
     echo "  backup   - Backup the database"
-    echo "  reset-db - Backup and delete database, restart with fresh db"
+    echo "  reset-db - Clear all usage data (keeps users and API keys)"
     echo "  clean    - Remove containers and images"
     echo "  help     - Show this help message"
     echo ""
