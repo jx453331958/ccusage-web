@@ -60,12 +60,15 @@ detect_runtime() {
 download_agent() {
     mkdir -p "$INSTALL_DIR"
 
+    # Add timestamp to bypass CDN cache
+    local cache_bust="?t=$(date +%s)"
+
     if [[ "$AGENT_RUNTIME" == "python" ]]; then
         log_info "Downloading agent.py..."
         if command -v curl &> /dev/null; then
-            curl -sL "$AGENT_PY_URL" -o "$AGENT_SCRIPT"
+            curl -sL "${AGENT_PY_URL}${cache_bust}" -o "$AGENT_SCRIPT"
         elif command -v wget &> /dev/null; then
-            wget -q "$AGENT_PY_URL" -O "$AGENT_SCRIPT"
+            wget -q "${AGENT_PY_URL}${cache_bust}" -O "$AGENT_SCRIPT"
         else
             log_error "curl or wget is required"
             exit 1
@@ -73,9 +76,9 @@ download_agent() {
     else
         log_info "Downloading agent.js..."
         if command -v curl &> /dev/null; then
-            curl -sL "$AGENT_JS_URL" -o "$AGENT_SCRIPT"
+            curl -sL "${AGENT_JS_URL}${cache_bust}" -o "$AGENT_SCRIPT"
         elif command -v wget &> /dev/null; then
-            wget -q "$AGENT_JS_URL" -O "$AGENT_SCRIPT"
+            wget -q "${AGENT_JS_URL}${cache_bust}" -O "$AGENT_SCRIPT"
         else
             log_error "curl or wget is required"
             exit 1

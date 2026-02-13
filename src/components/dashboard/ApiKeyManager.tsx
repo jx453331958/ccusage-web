@@ -98,52 +98,56 @@ export default function ApiKeyManager() {
     setTimeout(() => setCopiedCommandId(null), 2000);
   };
 
-  const SETUP_URL = 'https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh';
+  const SETUP_BASE_URL = 'https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh';
+
+  const getSetupUrl = () => `${SETUP_BASE_URL}?t=${Date.now()}`;
 
   const getCommands = (apiKey: string) => {
     const serverUrl = getServerUrl();
+    const url = getSetupUrl();
     return [
       {
         id: 'install',
         labelKey: 'cmdInstall' as const,
         descKey: 'cmdInstallDesc' as const,
         icon: Download,
-        command: `curl -sL ${SETUP_URL} | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`,
+        command: `curl -sL "${url}" | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`,
       },
       {
         id: 'update',
         labelKey: 'cmdUpdate' as const,
         descKey: 'cmdUpdateDesc' as const,
         icon: RefreshCw,
-        command: `curl -sL ${SETUP_URL} | bash -s update`,
+        command: `curl -sL "${url}" | bash -s update`,
       },
       {
         id: 'reset',
         labelKey: 'cmdReset' as const,
         descKey: 'cmdResetDesc' as const,
         icon: Activity,
-        command: `curl -sL ${SETUP_URL} | bash -s reset`,
+        command: `curl -sL "${url}" | bash -s reset`,
       },
       {
         id: 'status',
         labelKey: 'cmdStatus' as const,
         descKey: 'cmdStatusDesc' as const,
         icon: Terminal,
-        command: `curl -sL ${SETUP_URL} | bash -s status`,
+        command: `curl -sL "${url}" | bash -s status`,
       },
       {
         id: 'uninstall',
         labelKey: 'cmdUninstall' as const,
         descKey: 'cmdUninstallDesc' as const,
         icon: XCircle,
-        command: `curl -sL ${SETUP_URL} | bash -s uninstall`,
+        command: `curl -sL "${url}" | bash -s uninstall`,
       },
     ];
   };
 
   const getInstallCommand = (apiKey: string) => {
     const serverUrl = getServerUrl();
-    return `curl -sL ${SETUP_URL} | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`;
+    const url = getSetupUrl();
+    return `curl -sL "${url}" | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`;
   };
 
   return (
