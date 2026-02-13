@@ -276,9 +276,22 @@ function extractUsage(entry) {
   return usage;
 }
 
+// Parse timestamp to unix epoch seconds
+function parseTimestamp(ts) {
+  if (!ts) return Math.floor(Date.now() / 1000);
+  if (typeof ts === 'string') {
+    const ms = new Date(ts).getTime();
+    return isNaN(ms) ? Math.floor(Date.now() / 1000) : Math.floor(ms / 1000);
+  }
+  return Math.floor(ts);
+}
+
 // Parse JSONL file and extract usage records
+// Deduplicates by message ID: each API request may have multiple JSONL entries
+// (streaming chunks), but we only keep the last entry per message ID.
 function parseJsonlFile(filePath) {
-  const records = [];
+  // First pass: collect entries grouped by message ID
+  const msgMap = new Map(); // msgId -> best record data
 
   try {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -288,29 +301,23 @@ function parseJsonlFile(filePath) {
       try {
         const entry = JSON.parse(line);
         const usage = extractUsage(entry);
-        
+
         if (!usage) continue;
-        
+
         const inputTokens = usage.input_tokens || usage.inputTokens || 0;
         const outputTokens = usage.output_tokens || usage.outputTokens || 0;
         const cacheCreateTokens = usage.cache_creation_input_tokens || usage.cache_creation || 0;
         const cacheReadTokens = usage.cache_read_input_tokens || usage.cache_read || 0;
-        
+
         // Skip empty usage
         if (inputTokens === 0 && outputTokens === 0) continue;
-        
-        // Create unique record ID
-        const timestamp = entry.timestamp 
-          ? Math.floor(new Date(entry.timestamp).getTime() / 1000) 
-          : Math.floor(Date.now() / 1000);
-        const recordId = `${filePath}:${timestamp}:${inputTokens}:${outputTokens}:${cacheCreateTokens}:${cacheReadTokens}`;
 
-        // Skip if already reported
-        if (state.reportedRecords.has(recordId)) {
-          continue;
-        }
+        const timestamp = parseTimestamp(entry.timestamp);
 
-        records.push({
+        // Use message ID for dedup; fall back to content-based key
+        const msgId = entry.message?.id || `${filePath}:${timestamp}:${inputTokens}:${outputTokens}:${cacheCreateTokens}:${cacheReadTokens}`;
+
+        const recordData = {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           total_tokens: inputTokens + outputTokens,
@@ -319,14 +326,30 @@ function parseJsonlFile(filePath) {
           session_id: entry.sessionId || entry.session_id || null,
           model: usage.model || null,
           timestamp: timestamp,
-          _recordId: recordId,
-        });
+          _msgId: msgId,
+        };
+
+        // Keep the entry with the largest output_tokens per message ID
+        const existing = msgMap.get(msgId);
+        if (!existing || outputTokens >= existing.output_tokens) {
+          msgMap.set(msgId, recordData);
+        }
       } catch (err) {
         // Skip invalid JSON lines
       }
     }
   } catch (error) {
     console.error(`Error reading ${filePath}:`, error.message);
+  }
+
+  // Second pass: filter already-reported and build final records
+  const records = [];
+  for (const record of msgMap.values()) {
+    const recordId = `${filePath}:${record._msgId}`;
+    if (state.reportedRecords.has(recordId)) continue;
+    record._recordId = recordId;
+    delete record._msgId;
+    records.push(record);
   }
 
   return records;

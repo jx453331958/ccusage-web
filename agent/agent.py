@@ -193,9 +193,29 @@ def extract_usage(entry: Dict) -> Optional[Dict]:
     return usage
 
 
+def _parse_timestamp(timestamp_val) -> int:
+    """Parse a timestamp value to unix epoch seconds."""
+    if not timestamp_val:
+        return int(time.time())
+    if isinstance(timestamp_val, str):
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(timestamp_val.replace('Z', '+00:00'))
+            return int(dt.timestamp())
+        except Exception:
+            return int(time.time())
+    return int(timestamp_val)
+
+
 def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
-    """Parse a JSONL file and extract usage records."""
-    records = []
+    """Parse a JSONL file and extract usage records.
+
+    Deduplicates by message ID: each API request (message) may have multiple
+    JSONL entries (streaming chunks), but we only keep the last entry per
+    message ID to avoid over-counting.
+    """
+    # First pass: collect entries grouped by message ID
+    msg_map = {}  # msg_id -> best entry data (last/largest output)
 
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -220,30 +240,16 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
                     if input_tokens == 0 and output_tokens == 0:
                         continue
 
-                    # Get timestamp
-                    timestamp = entry.get('timestamp')
-                    if timestamp:
-                        if isinstance(timestamp, str):
-                            # Try to parse ISO format
-                            try:
-                                from datetime import datetime
-                                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                                timestamp = int(dt.timestamp())
-                            except Exception:
-                                timestamp = int(time.time())
-                        else:
-                            timestamp = int(timestamp)
-                    else:
-                        timestamp = int(time.time())
+                    timestamp = _parse_timestamp(entry.get('timestamp'))
 
-                    # Create unique record ID
-                    record_id = f'{file_path}:{timestamp}:{input_tokens}:{output_tokens}:{cache_create_tokens}:{cache_read_tokens}'
+                    # Use message ID for dedup; fall back to a unique key if not present
+                    msg = entry.get('message', {})
+                    msg_id = msg.get('id')
+                    if not msg_id:
+                        # No message ID - use content-based key
+                        msg_id = f'{file_path}:{timestamp}:{input_tokens}:{output_tokens}:{cache_create_tokens}:{cache_read_tokens}'
 
-                    # Skip if already reported
-                    if state.is_reported(record_id):
-                        continue
-
-                    records.append({
+                    record_data = {
                         'input_tokens': input_tokens,
                         'output_tokens': output_tokens,
                         'total_tokens': input_tokens + output_tokens,
@@ -252,14 +258,28 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
                         'session_id': entry.get('sessionId') or entry.get('session_id'),
                         'model': usage.get('model'),
                         'timestamp': timestamp,
-                        '_record_id': record_id,
-                    })
+                        '_msg_id': msg_id,
+                    }
+
+                    # Keep the entry with the largest output_tokens per message ID
+                    if msg_id not in msg_map or output_tokens >= msg_map[msg_id]['output_tokens']:
+                        msg_map[msg_id] = record_data
 
                 except json.JSONDecodeError:
                     continue
 
     except Exception as e:
         print(f'Error reading {file_path}: {e}', file=sys.stderr)
+
+    # Second pass: filter already-reported and build final records
+    records = []
+    for record in msg_map.values():
+        record_id = f"{file_path}:{record['_msg_id']}"
+        if state.is_reported(record_id):
+            continue
+        record['_record_id'] = record_id
+        del record['_msg_id']
+        records.append(record)
 
     return records
 
