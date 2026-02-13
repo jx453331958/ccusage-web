@@ -3,10 +3,13 @@
 interface PricingEntry {
   input_cost_per_token?: number;
   output_cost_per_token?: number;
-  input_cost_per_token_above_128k_tokens?: number;
-  output_cost_per_token_above_128k_tokens?: number;
+  // Claude/Anthropic: 200k threshold tiered pricing
+  input_cost_per_token_above_200k_tokens?: number;
+  output_cost_per_token_above_200k_tokens?: number;
   cache_creation_input_token_cost?: number;
   cache_read_input_token_cost?: number;
+  cache_creation_input_token_cost_above_200k_tokens?: number;
+  cache_read_input_token_cost_above_200k_tokens?: number;
 }
 
 interface PricingData {
@@ -108,36 +111,21 @@ export async function calculateCost(model: string, inputTokens: number, outputTo
   const entry = findPricing(pricing, model);
 
   if (entry && entry.input_cost_per_token != null && entry.output_cost_per_token != null) {
-    let inputCost: number;
-    let outputCost: number;
+    // Tiered pricing helper (matches ccusage CLI logic exactly)
+    const tieredCost = (tokens: number, basePrice: number | undefined, abovePrice: number | undefined): number => {
+      if (!tokens || tokens <= 0) return 0;
+      if (tokens > TIER_THRESHOLD && abovePrice != null) {
+        return TIER_THRESHOLD * (basePrice ?? 0) + (tokens - TIER_THRESHOLD) * abovePrice;
+      }
+      return tokens * (basePrice ?? 0);
+    };
 
-    // Handle tiered pricing
-    if (entry.input_cost_per_token_above_128k_tokens && inputTokens > TIER_THRESHOLD) {
-      const baseInput = TIER_THRESHOLD;
-      const overInput = inputTokens - TIER_THRESHOLD;
-      inputCost = baseInput * entry.input_cost_per_token + overInput * entry.input_cost_per_token_above_128k_tokens;
-    } else {
-      inputCost = inputTokens * entry.input_cost_per_token;
-    }
+    const inputCost = tieredCost(inputTokens, entry.input_cost_per_token, entry.input_cost_per_token_above_200k_tokens);
+    const outputCost = tieredCost(outputTokens, entry.output_cost_per_token, entry.output_cost_per_token_above_200k_tokens);
+    const cacheCreateCost = tieredCost(cacheCreateTokens, entry.cache_creation_input_token_cost, entry.cache_creation_input_token_cost_above_200k_tokens);
+    const cacheReadCost = tieredCost(cacheReadTokens, entry.cache_read_input_token_cost, entry.cache_read_input_token_cost_above_200k_tokens);
 
-    if (entry.output_cost_per_token_above_128k_tokens && outputTokens > TIER_THRESHOLD) {
-      const baseOutput = TIER_THRESHOLD;
-      const overOutput = outputTokens - TIER_THRESHOLD;
-      outputCost = baseOutput * entry.output_cost_per_token + overOutput * entry.output_cost_per_token_above_128k_tokens;
-    } else {
-      outputCost = outputTokens * entry.output_cost_per_token;
-    }
-
-    // Cache costs from LiteLLM pricing
-    let cacheCost = 0;
-    if (entry.cache_creation_input_token_cost && cacheCreateTokens > 0) {
-      cacheCost += cacheCreateTokens * entry.cache_creation_input_token_cost;
-    }
-    if (entry.cache_read_input_token_cost && cacheReadTokens > 0) {
-      cacheCost += cacheReadTokens * entry.cache_read_input_token_cost;
-    }
-
-    return inputCost + outputCost + cacheCost;
+    return inputCost + outputCost + cacheCreateCost + cacheReadCost;
   }
 
   // Fallback
