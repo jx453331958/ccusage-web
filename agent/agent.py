@@ -135,8 +135,33 @@ class State:
         self.last_reported_timestamp = int(time.time())
 
 
+def _get_earliest_timestamp(filepath: Path) -> str:
+    """Get earliest ISO timestamp from a JSONL file (for sorting, matching ccusage)."""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    ts = entry.get('timestamp', '')
+                    if isinstance(ts, str) and len(ts) > 10 and ts[4] == '-':
+                        return ts
+                except (json.JSONDecodeError, Exception):
+                    continue
+    except Exception:
+        pass
+    return 'z'  # Sort files with no valid timestamp last
+
+
 def find_jsonl_files(directory: Path) -> List[Path]:
-    """Recursively find all .jsonl files in directory."""
+    """Recursively find all .jsonl files, sorted by earliest timestamp.
+
+    Matches ccusage CLI file ordering: files are sorted by their earliest
+    timestamp so that parent session files are processed before subagent
+    files. This ensures consistent deduplication results.
+    """
     files = []
     if not directory.exists():
         return files
@@ -148,129 +173,118 @@ def find_jsonl_files(directory: Path) -> List[Path]:
     except PermissionError:
         pass
 
+    # Sort by earliest timestamp (matching ccusage CLI behavior)
+    files.sort(key=_get_earliest_timestamp)
     return files
 
 
-def extract_usage(entry: Dict) -> Optional[Dict]:
-    """Extract usage from an entry.
+_ISO_TS_RE = __import__('re').compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$')
 
-    Only processes entries with message.usage (matching ccusage CLI's
-    usageDataSchema exactly). Other formats are ignored to prevent
-    double-counting from streaming/duplicate entry types.
-    """
+
+def _validate_entry(entry: Dict) -> bool:
+    """Validate entry matches ccusage CLI's usageDataSchema."""
+    # timestamp: required ISO 8601 format
+    ts = entry.get('timestamp')
+    if not isinstance(ts, str) or not _ISO_TS_RE.match(ts):
+        return False
+    # message: required object with usage sub-object
     msg = entry.get('message')
     if not isinstance(msg, dict):
-        return None
-
+        return False
     usage = msg.get('usage')
     if not isinstance(usage, dict):
-        return None
-
-    # Require input_tokens and output_tokens (matching ccusage schema)
-    if 'input_tokens' not in usage or 'output_tokens' not in usage:
-        return None
-
-    # Attach model from message.model
-    model = msg.get('model')
-    if model:
-        usage['model'] = model
-
-    return usage
+        return False
+    # input_tokens and output_tokens: required numbers
+    if not isinstance(usage.get('input_tokens'), (int, float)):
+        return False
+    if not isinstance(usage.get('output_tokens'), (int, float)):
+        return False
+    return True
 
 
-def _parse_timestamp(timestamp_val) -> int:
-    """Parse a timestamp value to unix epoch seconds."""
-    if not timestamp_val:
-        return int(time.time())
-    if isinstance(timestamp_val, str):
-        try:
-            from datetime import datetime
-            dt = datetime.fromisoformat(timestamp_val.replace('Z', '+00:00'))
-            return int(dt.timestamp())
-        except Exception:
-            return int(time.time())
-    return int(timestamp_val)
-
-
-def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
-    """Parse a JSONL file and extract usage records.
-
-    Deduplicates by message.id:requestId (matching ccusage CLI logic):
-    each API request generates multiple streaming content block entries
-    with the same message.id and requestId. We keep only the first entry
-    per unique key to avoid over-counting.
-    """
-    # First pass: collect entries grouped by dedup key (message.id:requestId)
-    msg_map = {}  # dedup_key -> record data
-
+def _parse_timestamp(timestamp_str: str) -> int:
+    """Parse ISO timestamp string to unix epoch seconds."""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
+        from datetime import datetime
+        dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        return int(dt.timestamp())
+    except Exception:
+        return int(time.time())
 
-                try:
-                    entry = json.loads(line)
-                    usage = extract_usage(entry)
 
-                    if not usage:
+def collect_records(files: List[Path], state: 'State') -> List[Dict]:
+    """Parse all JSONL files and collect usage records.
+
+    Replicates ccusage CLI logic exactly:
+    1. Validate each entry against usageDataSchema
+    2. Create dedup hash: message.id:requestId (null if either missing)
+    3. null hash → always include (no dedup)
+    4. Existing hash → skip (duplicate)
+    5. New hash → include and mark as processed
+    6. Global processedHashes across ALL files
+    """
+    processed_hashes: Set[str] = set()
+    records: List[Dict] = []
+
+    for file_path in files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
                         continue
+                    try:
+                        entry = json.loads(line)
 
-                    input_tokens = usage.get('input_tokens') or usage.get('inputTokens') or 0
-                    output_tokens = usage.get('output_tokens') or usage.get('outputTokens') or 0
-                    cache_create_tokens = usage.get('cache_creation_input_tokens') or usage.get('cache_creation') or 0
-                    cache_read_tokens = usage.get('cache_read_input_tokens') or usage.get('cache_read') or 0
+                        # Step 1: Schema validation (matching ccusage)
+                        if not _validate_entry(entry):
+                            continue
 
-                    # Skip empty usage
-                    if input_tokens == 0 and output_tokens == 0:
+                        msg = entry['message']
+                        usage = msg['usage']
+
+                        input_tokens = usage['input_tokens']
+                        output_tokens = usage['output_tokens']
+                        cache_create = usage.get('cache_creation_input_tokens') or 0
+                        cache_read = usage.get('cache_read_input_tokens') or 0
+
+                        # Step 2: Create dedup hash (matching ccusage's createUniqueHash)
+                        message_id = msg.get('id')
+                        request_id = entry.get('requestId')
+                        if message_id is not None and request_id is not None:
+                            unique_hash = f'{message_id}:{request_id}'
+                        else:
+                            unique_hash = None
+
+                        # Step 3-4: Dedup check (matching ccusage's isDuplicateEntry)
+                        if unique_hash is not None:
+                            if unique_hash in processed_hashes:
+                                continue
+                            processed_hashes.add(unique_hash)
+
+                        # Step 5: Build record
+                        timestamp = _parse_timestamp(entry['timestamp'])
+                        record_id = f"{file_path}:{unique_hash or f'{timestamp}:{input_tokens}:{output_tokens}:{cache_create}:{cache_read}'}"
+
+                        if state.is_reported(record_id):
+                            continue
+
+                        records.append({
+                            'input_tokens': input_tokens,
+                            'output_tokens': output_tokens,
+                            'total_tokens': input_tokens + output_tokens,
+                            'cache_create_tokens': cache_create,
+                            'cache_read_tokens': cache_read,
+                            'session_id': entry.get('sessionId') or entry.get('session_id'),
+                            'model': msg.get('model'),
+                            'timestamp': timestamp,
+                            '_record_id': record_id,
+                        })
+
+                    except (json.JSONDecodeError, KeyError):
                         continue
-
-                    timestamp = _parse_timestamp(entry.get('timestamp'))
-
-                    # Dedup key: message.id:requestId (matching ccusage CLI logic)
-                    # If either field is missing, use a content-based fallback key
-                    msg = entry.get('message', {})
-                    message_id = msg.get('id')
-                    request_id = entry.get('requestId')
-                    if message_id and request_id:
-                        msg_id = f'{message_id}:{request_id}'
-                    else:
-                        # No dedup possible - use content-based key so each entry is unique
-                        msg_id = f'{file_path}:{timestamp}:{input_tokens}:{output_tokens}:{cache_create_tokens}:{cache_read_tokens}'
-
-                    record_data = {
-                        'input_tokens': input_tokens,
-                        'output_tokens': output_tokens,
-                        'total_tokens': input_tokens + output_tokens,
-                        'cache_create_tokens': cache_create_tokens,
-                        'cache_read_tokens': cache_read_tokens,
-                        'session_id': entry.get('sessionId') or entry.get('session_id'),
-                        'model': usage.get('model'),
-                        'timestamp': timestamp,
-                        '_msg_id': msg_id,
-                    }
-
-                    # Keep the FIRST entry per message ID (it has the correct final usage)
-                    # Later entries are streaming chunks with cumulative intermediate values
-                    if msg_id not in msg_map:
-                        msg_map[msg_id] = record_data
-
-                except json.JSONDecodeError:
-                    continue
-
-    except Exception as e:
-        print(f'Error reading {file_path}: {e}', file=sys.stderr)
-
-    # Second pass: filter already-reported and build final records
-    records = []
-    for record in msg_map.values():
-        record_id = f"{file_path}:{record['_msg_id']}"
-        if state.is_reported(record_id):
-            continue
-        record['_record_id'] = record_id
-        del record['_msg_id']
-        records.append(record)
+        except Exception as e:
+            print(f'Error reading {file_path}: {e}', file=sys.stderr)
 
     return records
 
@@ -375,11 +389,7 @@ def collect_and_report(config: Dict, state: State) -> bool:
     files = find_jsonl_files(config['claude_projects_dir'])
     print(f'Found {len(files)} JSONL files')
 
-    all_records = []
-    for file_path in files:
-        records = parse_jsonl_file(file_path, state)
-        all_records.extend(records)
-
+    all_records = collect_records(files, state)
     print(f'Collected {len(all_records)} new records')
 
     success = report_usage(all_records, config, state)

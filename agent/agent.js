@@ -188,7 +188,33 @@ function saveState() {
   }
 }
 
-// Find all JSONL files in Claude projects directory
+// Get earliest ISO timestamp from a JSONL file (for sorting, matching ccusage)
+function getEarliestTimestamp(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const entry = JSON.parse(trimmed);
+        const ts = entry.timestamp;
+        if (typeof ts === 'string' && ts.length > 10 && ts[4] === '-') {
+          return ts;
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return 'z'; // Sort files with no valid timestamp last
+}
+
+// Find all JSONL files in Claude projects directory, sorted by earliest timestamp.
+// Matches ccusage CLI file ordering so that parent session files are processed
+// before subagent files, ensuring consistent deduplication results.
 function findJsonlFiles() {
   const files = [];
 
@@ -214,112 +240,111 @@ function findJsonlFiles() {
   }
 
   walkDir(config.claudeProjectsDir);
+
+  // Sort by earliest timestamp (matching ccusage CLI behavior)
+  files.sort((a, b) => {
+    const tsA = getEarliestTimestamp(a);
+    const tsB = getEarliestTimestamp(b);
+    return tsA < tsB ? -1 : tsA > tsB ? 1 : 0;
+  });
+
   return files;
 }
 
-// Extract usage from an entry.
-// Only processes entries with message.usage (matching ccusage CLI's
-// usageDataSchema exactly). Other formats are ignored to prevent
-// double-counting from streaming/duplicate entry types.
-function extractUsage(entry) {
+// ISO 8601 timestamp pattern (matching ccusage CLI's isoTimestampSchema)
+const ISO_TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+
+// Validate entry matches ccusage CLI's usageDataSchema
+function validateEntry(entry) {
+  const ts = entry.timestamp;
+  if (typeof ts !== 'string' || !ISO_TS_RE.test(ts)) return false;
   const msg = entry.message;
-  if (!msg || typeof msg !== 'object') return null;
-
+  if (!msg || typeof msg !== 'object') return false;
   const usage = msg.usage;
-  if (!usage || typeof usage !== 'object') return null;
-
-  // Require input_tokens and output_tokens (matching ccusage schema)
-  if (usage.input_tokens === undefined || usage.output_tokens === undefined) return null;
-
-  // Attach model from message.model
-  if (msg.model) {
-    usage.model = msg.model;
-  }
-
-  return usage;
+  if (!usage || typeof usage !== 'object') return false;
+  if (typeof usage.input_tokens !== 'number') return false;
+  if (typeof usage.output_tokens !== 'number') return false;
+  return true;
 }
 
 // Parse timestamp to unix epoch seconds
 function parseTimestamp(ts) {
-  if (!ts) return Math.floor(Date.now() / 1000);
   if (typeof ts === 'string') {
     const ms = new Date(ts).getTime();
     return isNaN(ms) ? Math.floor(Date.now() / 1000) : Math.floor(ms / 1000);
   }
-  return Math.floor(ts);
+  return Math.floor(Date.now() / 1000);
 }
 
-// Parse JSONL file and extract usage records
-// Deduplicates by message.id:requestId (matching ccusage CLI logic):
-// each API request generates multiple streaming content block entries
-// with the same message.id and requestId. We keep only the first entry
-// per unique key to avoid over-counting.
-function parseJsonlFile(filePath) {
-  // First pass: collect entries grouped by dedup key (message.id:requestId)
-  const msgMap = new Map(); // dedupKey -> record data
-
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lines = content.split('\n').filter((line) => line.trim());
-
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line);
-        const usage = extractUsage(entry);
-
-        if (!usage) continue;
-
-        const inputTokens = usage.input_tokens || usage.inputTokens || 0;
-        const outputTokens = usage.output_tokens || usage.outputTokens || 0;
-        const cacheCreateTokens = usage.cache_creation_input_tokens || usage.cache_creation || 0;
-        const cacheReadTokens = usage.cache_read_input_tokens || usage.cache_read || 0;
-
-        // Skip empty usage
-        if (inputTokens === 0 && outputTokens === 0) continue;
-
-        const timestamp = parseTimestamp(entry.timestamp);
-
-        // Dedup key: message.id:requestId (matching ccusage CLI logic)
-        // If either field is missing, use a content-based fallback key
-        const messageId = entry.message?.id;
-        const requestId = entry.requestId;
-        const msgId = (messageId && requestId)
-          ? `${messageId}:${requestId}`
-          : `${filePath}:${timestamp}:${inputTokens}:${outputTokens}:${cacheCreateTokens}:${cacheReadTokens}`;
-
-        const recordData = {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          total_tokens: inputTokens + outputTokens,
-          cache_create_tokens: cacheCreateTokens,
-          cache_read_tokens: cacheReadTokens,
-          session_id: entry.sessionId || entry.session_id || null,
-          model: usage.model || null,
-          timestamp: timestamp,
-          _msgId: msgId,
-        };
-
-        // Keep the FIRST entry per message ID (it has the correct final usage)
-        // Later entries are streaming chunks with cumulative intermediate values
-        if (!msgMap.has(msgId)) {
-          msgMap.set(msgId, recordData);
-        }
-      } catch (err) {
-        // Skip invalid JSON lines
-      }
-    }
-  } catch (error) {
-    console.error(`Error reading ${filePath}:`, error.message);
-  }
-
-  // Second pass: filter already-reported and build final records
+// Collect records from all JSONL files with GLOBAL dedup across files.
+// Replicates ccusage CLI logic exactly:
+// 1. Validate each entry against usageDataSchema
+// 2. Create dedup hash: message.id:requestId (null if either missing)
+// 3. null hash → always include (no dedup)
+// 4. Existing hash → skip (duplicate)
+// 5. New hash → include and mark as processed
+function collectRecords(files) {
+  const processedHashes = new Set();
   const records = [];
-  for (const record of msgMap.values()) {
-    const recordId = `${filePath}:${record._msgId}`;
-    if (state.reportedRecords.has(recordId)) continue;
-    record._recordId = recordId;
-    delete record._msgId;
-    records.push(record);
+
+  for (const filePath of files) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const lines = content.split('\n');
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const entry = JSON.parse(trimmed);
+
+          // Step 1: Schema validation (matching ccusage)
+          if (!validateEntry(entry)) continue;
+
+          const msg = entry.message;
+          const usage = msg.usage;
+          const inputTokens = usage.input_tokens;
+          const outputTokens = usage.output_tokens;
+          const cacheCreate = usage.cache_creation_input_tokens || 0;
+          const cacheRead = usage.cache_read_input_tokens || 0;
+
+          // Step 2: Create dedup hash (matching ccusage's createUniqueHash)
+          const messageId = msg.id;
+          const requestId = entry.requestId;
+          const uniqueHash = (messageId != null && requestId != null)
+            ? `${messageId}:${requestId}`
+            : null;
+
+          // Step 3-4: Dedup check (matching ccusage's isDuplicateEntry)
+          if (uniqueHash !== null) {
+            if (processedHashes.has(uniqueHash)) continue;
+            processedHashes.add(uniqueHash);
+          }
+
+          // Step 5: Build record
+          const timestamp = parseTimestamp(entry.timestamp);
+          const recordId = `${filePath}:${uniqueHash || `${timestamp}:${inputTokens}:${outputTokens}:${cacheCreate}:${cacheRead}`}`;
+
+          if (state.reportedRecords.has(recordId)) continue;
+
+          records.push({
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            total_tokens: inputTokens + outputTokens,
+            cache_create_tokens: cacheCreate,
+            cache_read_tokens: cacheRead,
+            session_id: entry.sessionId || entry.session_id || null,
+            model: msg.model || null,
+            timestamp: timestamp,
+            _recordId: recordId,
+          });
+        } catch (err) {
+          // Skip invalid JSON lines
+        }
+      }
+    } catch (error) {
+      console.error(`Error reading ${filePath}:`, error.message);
+    }
   }
 
   return records;
@@ -448,12 +473,7 @@ async function run() {
     const files = findJsonlFiles();
     console.log(`Found ${files.length} JSONL files`);
 
-    let allRecords = [];
-    for (const file of files) {
-      const records = parseJsonlFile(file);
-      allRecords = allRecords.concat(records);
-    }
-
+    const allRecords = collectRecords(files);
     console.log(`Collected ${allRecords.length} new records`);
 
     const success = await reportUsage(allRecords);
