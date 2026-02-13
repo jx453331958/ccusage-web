@@ -145,7 +145,8 @@
       "out": "输出",
       "cacheWrite": "缓存写入",
       "cacheRead": "缓存读取",
-      "allDevices": "所有设备"
+      "allDevices": "所有设备",
+      "devicesCount": "{count} 台设备"
     }
   },
   "settings": {

@@ -22,10 +22,10 @@ function getIntervalMinutes(interval: Interval): number {
   }
 }
 
-function buildTrendQuery(interval: Interval, hasDevice: boolean): string {
+function buildTrendQuery(interval: Interval, deviceCount: number): string {
   const minutes = getIntervalMinutes(interval);
   const intervalSeconds = minutes * 60;
-  const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
+  const deviceFilter = deviceCount > 0 ? `AND device_name IN (${Array(deviceCount).fill('?').join(',')})` : '';
 
   return `
     SELECT
@@ -127,10 +127,10 @@ function generateCompleteModelTimeSeries(
   return result;
 }
 
-function buildModelTrendQuery(interval: Interval, hasDevice: boolean): string {
+function buildModelTrendQuery(interval: Interval, deviceCount: number): string {
   const minutes = getIntervalMinutes(interval);
   const intervalSeconds = minutes * 60;
-  const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
+  const deviceFilter = deviceCount > 0 ? `AND device_name IN (${Array(deviceCount).fill('?').join(',')})` : '';
 
   return `
     SELECT
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
   const interval = (searchParams.get('interval') || 'auto') as Interval | 'auto';
   const fromParam = searchParams.get('from');
   const toParam = searchParams.get('to');
-  const deviceParam = searchParams.get('device'); // Optional device filter
+  const devicesParam = searchParams.get('devices'); // Optional device filter (comma-separated)
 
   // Calculate timestamp range
   const now = Math.floor(Date.now() / 1000);
@@ -209,8 +209,9 @@ export async function GET(request: NextRequest) {
   const intervalSeconds = getIntervalMinutes(effectiveInterval) * 60;
 
   const db = getDb();
-  const hasDevice = !!deviceParam;
-  const deviceFilter = hasDevice ? 'AND device_name = ?' : '';
+  const devices = devicesParam ? devicesParam.split(',').filter(Boolean) : [];
+  const deviceCount = devices.length;
+  const deviceFilter = deviceCount > 0 ? `AND device_name IN (${Array(deviceCount).fill('?').join(',')})` : '';
 
   // Get list of all available devices (unfiltered by time range and device selection)
   const availableDevices = db.prepare(`
@@ -220,7 +221,7 @@ export async function GET(request: NextRequest) {
   `).all() as { device_name: string }[];
 
   // Base query params
-  const baseParams = hasDevice ? [startTime, endTime, deviceParam] : [startTime, endTime];
+  const baseParams = deviceCount > 0 ? [startTime, endTime, ...devices] : [startTime, endTime];
 
   // Get total stats (filtered by device if specified)
   const totalStats = db.prepare(`
@@ -253,7 +254,7 @@ export async function GET(request: NextRequest) {
   `).all(startTime, endTime);
 
   // Get trend data with selected interval (filtered by device if specified)
-  const trendQuery = buildTrendQuery(effectiveInterval, hasDevice);
+  const trendQuery = buildTrendQuery(effectiveInterval, deviceCount);
   const trendDataRaw = db.prepare(trendQuery).all(...baseParams) as {
     timestamp: number;
     input_tokens: number;
@@ -267,7 +268,7 @@ export async function GET(request: NextRequest) {
   const trendData = generateCompleteTimeSeries(trendDataRaw, startTime, endTime, effectiveInterval);
 
   // Get model trend data (for per-model charts, filtered by device if specified)
-  const modelTrendQuery = buildModelTrendQuery(effectiveInterval, hasDevice);
+  const modelTrendQuery = buildModelTrendQuery(effectiveInterval, deviceCount);
   const modelTrendRawData = db.prepare(modelTrendQuery).all(...baseParams) as {
     timestamp: number;
     model: string;
@@ -331,7 +332,7 @@ export async function GET(request: NextRequest) {
     deviceCostMap.set(r.device_name, (deviceCostMap.get(r.device_name) || 0) + cost);
 
     // Apply device filter for total, per-model, trend costs
-    if (hasDevice && r.device_name !== deviceParam) continue;
+    if (deviceCount > 0 && !devices.includes(r.device_name)) continue;
 
     totalCost += cost;
     modelCostMap.set(r.model, (modelCostMap.get(r.model) || 0) + cost);

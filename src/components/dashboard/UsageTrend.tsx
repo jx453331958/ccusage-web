@@ -5,10 +5,11 @@ import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Interval } from './DashboardClient';
 
@@ -120,6 +121,7 @@ export default function UsageTrend({
   const [viewMode, setViewMode] = useState<ViewMode>('total');
   const [modelMetric, setModelMetric] = useState<ModelMetric>('total_tokens');
   const [showZeroValues, setShowZeroValues] = useState(false);
+  const [intervalOpen, setIntervalOpen] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -435,13 +437,14 @@ export default function UsageTrend({
           {/* Title + desktop controls */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <CardTitle>{t('title')}</CardTitle>
-            {/* Desktop: inline view mode + show zero */}
-            <div className="hidden sm:flex items-center gap-3 flex-wrap">
-              <div className="flex gap-1.5">
+            {/* Desktop controls */}
+            <div className="hidden sm:flex items-center gap-2 flex-wrap">
+              <div className="flex gap-1">
                 <Button
                   size="sm"
                   variant={viewMode === 'total' ? 'default' : 'outline'}
                   onClick={() => setViewMode('total')}
+                  className="h-8"
                 >
                   {t('viewTotal')}
                 </Button>
@@ -449,6 +452,7 @@ export default function UsageTrend({
                   size="sm"
                   variant={viewMode === 'model' ? 'default' : 'outline'}
                   onClick={() => setViewMode('model')}
+                  className="h-8"
                 >
                   {t('viewByModel')}
                 </Button>
@@ -472,13 +476,41 @@ export default function UsageTrend({
                 </>
               )}
               <div className="h-5 w-px bg-border" />
+              <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                    <span className="text-muted-foreground text-xs">{t('intervalLabel')}:</span>
+                    <span className="font-medium text-xs">{t(`interval.${interval === 'auto' ? 'auto' : interval}`)}</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2" align="end">
+                  <div className="grid grid-cols-3 gap-1">
+                    {INTERVAL_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => { onIntervalChange(option.value); setIntervalOpen(false); }}
+                        className={cn(
+                          'px-3 py-1.5 text-sm rounded-md transition-colors text-center',
+                          interval === option.value
+                            ? 'bg-primary text-primary-foreground'
+                            : 'hover:bg-accent text-foreground'
+                        )}
+                      >
+                        {t(`interval.${option.labelKey}`)}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <div className="h-5 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <Switch
                   id="show-zero"
                   checked={showZeroValues}
                   onCheckedChange={setShowZeroValues}
                 />
-                <Label htmlFor="show-zero" className="text-sm cursor-pointer">
+                <Label htmlFor="show-zero" className="text-sm cursor-pointer whitespace-nowrap">
                   {t('showZeroValues')}
                 </Label>
               </div>
@@ -533,34 +565,45 @@ export default function UsageTrend({
             </div>
           )}
 
-          {/* Interval selector: scrollable on mobile, wrapping on desktop */}
-          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap scrollbar-hide -mx-6 px-6 sm:mx-0 sm:px-0">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0">
-              {t('intervalLabel')}
-            </span>
-            {INTERVAL_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                size="sm"
-                variant={interval === option.value ? 'default' : 'outline'}
-                onClick={() => onIntervalChange(option.value)}
-                className="shrink-0 h-7 px-2.5 text-xs sm:h-9 sm:px-3 sm:text-sm"
-              >
-                {t(`interval.${option.labelKey}`)}
-              </Button>
-            ))}
-          </div>
-
-          {/* Mobile: show zero values toggle */}
+          {/* Mobile: interval dropdown + show zero toggle */}
           <div className="sm:hidden flex items-center justify-between">
-            <Label htmlFor="show-zero-mobile" className="text-sm text-muted-foreground cursor-pointer">
-              {t('showZeroValues')}
-            </Label>
-            <Switch
-              id="show-zero-mobile"
-              checked={showZeroValues}
-              onCheckedChange={setShowZeroValues}
-            />
+            <Popover open={intervalOpen} onOpenChange={setIntervalOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                  <span className="text-muted-foreground text-xs">{t('intervalLabel')}:</span>
+                  <span className="font-medium text-xs">{t(`interval.${interval === 'auto' ? 'auto' : interval}`)}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="grid grid-cols-3 gap-1">
+                  {INTERVAL_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => { onIntervalChange(option.value); setIntervalOpen(false); }}
+                      className={cn(
+                        'px-3 py-1.5 text-sm rounded-md transition-colors text-center',
+                        interval === option.value
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-accent text-foreground'
+                      )}
+                    >
+                      {t(`interval.${option.labelKey}`)}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="show-zero-mobile" className="text-sm text-muted-foreground cursor-pointer">
+                {t('showZeroValues')}
+              </Label>
+              <Switch
+                id="show-zero-mobile"
+                checked={showZeroValues}
+                onCheckedChange={setShowZeroValues}
+              />
+            </div>
           </div>
         </div>
       </CardHeader>

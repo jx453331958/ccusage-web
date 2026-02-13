@@ -145,7 +145,8 @@
       "out": "out",
       "cacheWrite": "cache write",
       "cacheRead": "cache read",
-      "allDevices": "All Devices"
+      "allDevices": "All Devices",
+      "devicesCount": "{count} Devices"
     }
   },
   "settings": {

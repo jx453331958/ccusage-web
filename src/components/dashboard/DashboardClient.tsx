@@ -13,7 +13,7 @@ import 'dayjs/locale/zh-cn';
 dayjs.extend(isoWeek);
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { LogOut, Activity, Settings, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2 } from 'lucide-react';
+import { LogOut, Activity, Settings, BarChart3, Cpu, Key, Monitor, ChevronDown, Loader2, Check } from 'lucide-react';
 import StatsOverview from './StatsOverview';
 import DeviceList from './DeviceList';
 import ApiKeyManager from './ApiKeyManager';
@@ -61,7 +61,7 @@ export default function DashboardClient({ user }: { user: User }) {
   const [dataLoading, setDataLoading] = useState(false); // Loading state for data switching
   const [chartLoading, setChartLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [deviceDropdownOpen, setDeviceDropdownOpen] = useState(false);
   const [tabDropdownOpen, setTabDropdownOpen] = useState(false);
   const [activePresetKey, setActivePresetKey] = useState<string | null>('today');
@@ -80,8 +80,9 @@ export default function DashboardClient({ user }: { user: User }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Stable key for dateRange to use in useEffect deps
+  // Stable keys for useEffect deps
   const dateRangeKey = `${dateRange[0].valueOf()}-${dateRange[1].valueOf()}`;
+  const selectedDevicesKey = selectedDevices.join(',');
 
   // Build URL for API call
   const buildStatsUrl = useCallback((intervalOverride?: Interval) => {
@@ -96,12 +97,12 @@ export default function DashboardClient({ user }: { user: User }) {
 
     url += `&from=${from}&to=${to}`;
 
-    if (selectedDevice) {
-      url += `&device=${encodeURIComponent(selectedDevice)}`;
+    if (selectedDevices.length > 0) {
+      url += `&devices=${encodeURIComponent(selectedDevices.join(','))}`;
     }
 
     return url;
-  }, [dateRangeKey, interval, selectedDevice]);
+  }, [dateRangeKey, interval, selectedDevicesKey]);
 
   // Full fetch - shows loading state, updates all data
   const fetchStats = useCallback(async () => {
@@ -151,7 +152,7 @@ export default function DashboardClient({ user }: { user: User }) {
   // Initial load and when filter params change (except interval)
   useEffect(() => {
     fetchStats();
-  }, [dateRangeKey, selectedDevice]); // Note: interval not included
+  }, [dateRangeKey, selectedDevicesKey]); // Note: interval not included
 
   // Handle interval change - only update chart, no full page reload
   const handleIntervalChange = useCallback((newInterval: Interval) => {
@@ -274,8 +275,12 @@ export default function DashboardClient({ user }: { user: User }) {
                 >
                   <span className="flex items-center gap-2">
                     <Monitor className="h-4 w-4" />
-                    <span className="truncate max-w-[100px]">
-                      {selectedDevice || t('dashboard.devices.allDevices')}
+                    <span className="truncate max-w-[120px]">
+                      {selectedDevices.length === 0
+                        ? t('dashboard.devices.allDevices')
+                        : selectedDevices.length === 1
+                          ? selectedDevices[0]
+                          : t('dashboard.devices.devicesCount', { count: selectedDevices.length })}
                     </span>
                   </span>
                   <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
@@ -283,33 +288,48 @@ export default function DashboardClient({ user }: { user: User }) {
                 {deviceDropdownOpen && stats?.availableDevices && (
                   <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-background border rounded-md shadow-lg py-1">
                     <button
-                      onClick={() => {
-                        setSelectedDevice(null);
-                        setDeviceDropdownOpen(false);
-                      }}
+                      onClick={() => setSelectedDevices([])}
                       className={cn(
                         "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
-                        !selectedDevice && "bg-accent/50 font-medium"
+                        selectedDevices.length === 0 && "bg-accent/50 font-medium"
                       )}
                     >
+                      <div className={cn(
+                        "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
+                        selectedDevices.length === 0 ? "bg-primary border-primary" : "border-input"
+                      )}>
+                        {selectedDevices.length === 0 && <Check className="h-3 w-3 text-primary-foreground" />}
+                      </div>
                       <Monitor className="h-4 w-4" />
                       {t('dashboard.devices.allDevices')}
                     </button>
-                    {stats.availableDevices.map((device: string) => (
-                      <button
-                        key={device}
-                        onClick={() => {
-                          setSelectedDevice(device);
-                          setDeviceDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2 text-left text-sm hover:bg-accent truncate",
-                          selectedDevice === device && "bg-accent/50 font-medium"
-                        )}
-                      >
-                        {device}
-                      </button>
-                    ))}
+                    {stats.availableDevices.map((device: string) => {
+                      const isSelected = selectedDevices.includes(device);
+                      return (
+                        <button
+                          key={device}
+                          onClick={() => {
+                            setSelectedDevices(prev =>
+                              prev.includes(device)
+                                ? prev.filter(d => d !== device)
+                                : [...prev, device]
+                            );
+                          }}
+                          className={cn(
+                            "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
+                            isSelected && "bg-accent/50 font-medium"
+                          )}
+                        >
+                          <div className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
+                            isSelected ? "bg-primary border-primary" : "border-input"
+                          )}>
+                            {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                          </div>
+                          <span className="truncate">{device}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
