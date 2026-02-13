@@ -217,60 +217,23 @@ function findJsonlFiles() {
   return files;
 }
 
-// Extract model from an entry (supports multiple formats)
-function extractModel(entry) {
-  // Format 1: Assistant message with model
-  if (entry.message?.model) {
-    return entry.message.model;
-  }
-
-  // Format 2: Direct model field
-  if (entry.model) {
-    return entry.model;
-  }
-
-  // Format 3: Nested in response
-  if (entry.response?.model) {
-    return entry.response.model;
-  }
-
-  return null;
-}
-
-// Extract usage from an entry (supports multiple formats)
+// Extract usage from an entry.
+// Only processes entries with message.usage (matching ccusage CLI's
+// usageDataSchema exactly). Other formats are ignored to prevent
+// double-counting from streaming/duplicate entry types.
 function extractUsage(entry) {
-  let usage = null;
+  const msg = entry.message;
+  if (!msg || typeof msg !== 'object') return null;
 
-  // Format 1: Direct usage object (type: "usage")
-  if (entry.type === 'usage' && entry.usage) {
-    usage = entry.usage;
-  }
-  // Format 2: Assistant message with usage (type: "assistant")
-  else if (entry.type === 'assistant' && entry.message?.usage) {
-    usage = entry.message.usage;
-  }
-  // Format 3: Top-level usage field
-  else if (entry.usage && (entry.usage.input_tokens || entry.usage.output_tokens)) {
-    usage = entry.usage;
-  }
-  // Format 4: costUSD with inputTokens/outputTokens (ccusage format)
-  else if (entry.inputTokens !== undefined || entry.outputTokens !== undefined) {
-    usage = {
-      input_tokens: entry.inputTokens || 0,
-      output_tokens: entry.outputTokens || 0,
-    };
-  }
-  // Format 5: Nested in response
-  else if (entry.response?.usage) {
-    usage = entry.response.usage;
-  }
+  const usage = msg.usage;
+  if (!usage || typeof usage !== 'object') return null;
 
-  if (!usage) return null;
+  // Require input_tokens and output_tokens (matching ccusage schema)
+  if (usage.input_tokens === undefined || usage.output_tokens === undefined) return null;
 
-  // Attach model to usage object
-  const model = extractModel(entry);
-  if (model) {
-    usage.model = model;
+  // Attach model from message.model
+  if (msg.model) {
+    usage.model = msg.model;
   }
 
   return usage;

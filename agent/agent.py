@@ -151,44 +151,29 @@ def find_jsonl_files(directory: Path) -> List[Path]:
     return files
 
 
-def extract_model(entry: Dict) -> Optional[str]:
-    """Extract model from an entry (supports multiple formats)."""
-    if entry.get('message', {}).get('model'):
-        return entry['message']['model']
-    if entry.get('model'):
-        return entry['model']
-    if entry.get('response', {}).get('model'):
-        return entry['response']['model']
-    return None
-
-
 def extract_usage(entry: Dict) -> Optional[Dict]:
-    """Extract usage from an entry (supports multiple formats)."""
-    usage = None
+    """Extract usage from an entry.
 
-    # Format 1: Direct usage object (type: "usage")
-    if entry.get('type') == 'usage' and entry.get('usage'):
-        usage = entry['usage']
-    # Format 2: Assistant message with usage
-    elif entry.get('type') == 'assistant' and entry.get('message', {}).get('usage'):
-        usage = entry['message']['usage']
-    # Format 3: Top-level usage field
-    elif entry.get('usage') and (entry['usage'].get('input_tokens') or entry['usage'].get('output_tokens')):
-        usage = entry['usage']
-    # Format 4: ccusage format (inputTokens/outputTokens)
-    elif entry.get('inputTokens') is not None or entry.get('outputTokens') is not None:
-        usage = {
-            'input_tokens': entry.get('inputTokens', 0),
-            'output_tokens': entry.get('outputTokens', 0),
-        }
-    # Format 5: Nested in response
-    elif entry.get('response', {}).get('usage'):
-        usage = entry['response']['usage']
+    Only processes entries with message.usage (matching ccusage CLI's
+    usageDataSchema exactly). Other formats are ignored to prevent
+    double-counting from streaming/duplicate entry types.
+    """
+    msg = entry.get('message')
+    if not isinstance(msg, dict):
+        return None
 
-    if usage:
-        model = extract_model(entry)
-        if model:
-            usage['model'] = model
+    usage = msg.get('usage')
+    if not isinstance(usage, dict):
+        return None
+
+    # Require input_tokens and output_tokens (matching ccusage schema)
+    if 'input_tokens' not in usage or 'output_tokens' not in usage:
+        return None
+
+    # Attach model from message.model
+    model = msg.get('model')
+    if model:
+        usage['model'] = model
 
     return usage
 

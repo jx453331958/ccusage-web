@@ -12,7 +12,7 @@ interface PricingEntry {
   cache_read_input_token_cost_above_200k_tokens?: number;
 }
 
-interface PricingData {
+export interface PricingData {
   [model: string]: PricingEntry;
 }
 
@@ -21,17 +21,17 @@ let cacheTimestamp = 0;
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Fallback prices per token (USD) for common Claude models
-const FALLBACK_PRICING: Record<string, { input: number; output: number; inputAbove128k?: number; outputAbove128k?: number; cacheWrite?: number; cacheRead?: number }> = {
-  'claude-opus-4': { input: 15 / 1e6, output: 75 / 1e6, inputAbove128k: 15 / 1e6, outputAbove128k: 75 / 1e6, cacheWrite: 18.75 / 1e6, cacheRead: 1.875 / 1e6 },
-  'claude-sonnet-4': { input: 3 / 1e6, output: 15 / 1e6, inputAbove128k: 3 / 1e6, outputAbove128k: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
-  'claude-3.5-sonnet': { input: 3 / 1e6, output: 15 / 1e6, inputAbove128k: 3 / 1e6, outputAbove128k: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
-  'claude-3.5-haiku': { input: 0.8 / 1e6, output: 4 / 1e6, inputAbove128k: 1 / 1e6, outputAbove128k: 5 / 1e6, cacheWrite: 1.50 / 1e6, cacheRead: 0.10 / 1e6 },
-  'claude-3-opus': { input: 15 / 1e6, output: 75 / 1e6, inputAbove128k: 15 / 1e6, outputAbove128k: 75 / 1e6, cacheWrite: 18.75 / 1e6, cacheRead: 1.875 / 1e6 },
+const FALLBACK_PRICING: Record<string, { input: number; output: number; inputAbove200k?: number; outputAbove200k?: number; cacheWrite?: number; cacheRead?: number }> = {
+  'claude-opus-4': { input: 15 / 1e6, output: 75 / 1e6, inputAbove200k: 15 / 1e6, outputAbove200k: 75 / 1e6, cacheWrite: 18.75 / 1e6, cacheRead: 1.875 / 1e6 },
+  'claude-sonnet-4': { input: 3 / 1e6, output: 15 / 1e6, inputAbove200k: 3 / 1e6, outputAbove200k: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
+  'claude-3.5-sonnet': { input: 3 / 1e6, output: 15 / 1e6, inputAbove200k: 3 / 1e6, outputAbove200k: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
+  'claude-3.5-haiku': { input: 0.8 / 1e6, output: 4 / 1e6, inputAbove200k: 1 / 1e6, outputAbove200k: 5 / 1e6, cacheWrite: 1.50 / 1e6, cacheRead: 0.10 / 1e6 },
+  'claude-3-opus': { input: 15 / 1e6, output: 75 / 1e6, inputAbove200k: 15 / 1e6, outputAbove200k: 75 / 1e6, cacheWrite: 18.75 / 1e6, cacheRead: 1.875 / 1e6 },
   'claude-3-sonnet': { input: 3 / 1e6, output: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
   'claude-3-haiku': { input: 0.25 / 1e6, output: 1.25 / 1e6, cacheWrite: 1.50 / 1e6, cacheRead: 0.10 / 1e6 },
 };
 
-async function fetchPricing(): Promise<PricingData> {
+export async function fetchPricing(): Promise<PricingData> {
   const now = Date.now();
   if (cachedPricing && now - cacheTimestamp < CACHE_TTL) {
     return cachedPricing;
@@ -87,7 +87,7 @@ function findPricing(pricing: PricingData, model: string): PricingEntry | null {
   return null;
 }
 
-function findFallback(model: string): { input: number; output: number; inputAbove128k?: number; outputAbove128k?: number; cacheWrite?: number; cacheRead?: number } | null {
+function findFallback(model: string): { input: number; output: number; inputAbove200k?: number; outputAbove200k?: number; cacheWrite?: number; cacheRead?: number } | null {
   // Try prefix matching against fallback keys
   for (const [key, value] of Object.entries(FALLBACK_PRICING)) {
     if (model.startsWith(key) || model.includes(key)) {
@@ -106,55 +106,46 @@ function findFallback(model: string): { input: number; output: number; inputAbov
 
 const TIER_THRESHOLD = 200000; // 200k tokens
 
-export async function calculateCost(model: string, inputTokens: number, outputTokens: number, cacheCreateTokens: number = 0, cacheReadTokens: number = 0): Promise<number> {
-  const pricing = await fetchPricing();
+// Tiered pricing: applies threshold per individual API request (not aggregated)
+function tieredCost(tokens: number, basePrice: number | undefined, abovePrice: number | undefined): number {
+  if (!tokens || tokens <= 0) return 0;
+  if (tokens > TIER_THRESHOLD && abovePrice != null) {
+    return TIER_THRESHOLD * (basePrice ?? 0) + (tokens - TIER_THRESHOLD) * abovePrice;
+  }
+  return tokens * (basePrice ?? 0);
+}
+
+/**
+ * Calculate cost for a single record using pre-fetched pricing data.
+ * This is the synchronous version - use when you already have pricing data.
+ * Tiered pricing is applied per-record (matching ccusage CLI behavior).
+ */
+export function calculateCostWithPricing(
+  pricing: PricingData,
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreateTokens: number = 0,
+  cacheReadTokens: number = 0,
+): number {
   const entry = findPricing(pricing, model);
 
   if (entry && entry.input_cost_per_token != null && entry.output_cost_per_token != null) {
-    // Tiered pricing helper (matches ccusage CLI logic exactly)
-    const tieredCost = (tokens: number, basePrice: number | undefined, abovePrice: number | undefined): number => {
-      if (!tokens || tokens <= 0) return 0;
-      if (tokens > TIER_THRESHOLD && abovePrice != null) {
-        return TIER_THRESHOLD * (basePrice ?? 0) + (tokens - TIER_THRESHOLD) * abovePrice;
-      }
-      return tokens * (basePrice ?? 0);
-    };
-
     const inputCost = tieredCost(inputTokens, entry.input_cost_per_token, entry.input_cost_per_token_above_200k_tokens);
     const outputCost = tieredCost(outputTokens, entry.output_cost_per_token, entry.output_cost_per_token_above_200k_tokens);
     const cacheCreateCost = tieredCost(cacheCreateTokens, entry.cache_creation_input_token_cost, entry.cache_creation_input_token_cost_above_200k_tokens);
     const cacheReadCost = tieredCost(cacheReadTokens, entry.cache_read_input_token_cost, entry.cache_read_input_token_cost_above_200k_tokens);
-
     return inputCost + outputCost + cacheCreateCost + cacheReadCost;
   }
 
   // Fallback
   const fallback = findFallback(model);
   if (fallback) {
-    let inputCost: number;
-    let outputCost: number;
-
-    if (fallback.inputAbove128k && inputTokens > TIER_THRESHOLD) {
-      inputCost = TIER_THRESHOLD * fallback.input + (inputTokens - TIER_THRESHOLD) * fallback.inputAbove128k;
-    } else {
-      inputCost = inputTokens * fallback.input;
-    }
-
-    if (fallback.outputAbove128k && outputTokens > TIER_THRESHOLD) {
-      outputCost = TIER_THRESHOLD * fallback.output + (outputTokens - TIER_THRESHOLD) * fallback.outputAbove128k;
-    } else {
-      outputCost = outputTokens * fallback.output;
-    }
-
-    // Cache costs from fallback
+    const inputCost = tieredCost(inputTokens, fallback.input, fallback.inputAbove200k);
+    const outputCost = tieredCost(outputTokens, fallback.output, fallback.outputAbove200k);
     let cacheCost = 0;
-    if (fallback.cacheWrite && cacheCreateTokens > 0) {
-      cacheCost += cacheCreateTokens * fallback.cacheWrite;
-    }
-    if (fallback.cacheRead && cacheReadTokens > 0) {
-      cacheCost += cacheReadTokens * fallback.cacheRead;
-    }
-
+    if (fallback.cacheWrite && cacheCreateTokens > 0) cacheCost += cacheCreateTokens * fallback.cacheWrite;
+    if (fallback.cacheRead && cacheReadTokens > 0) cacheCost += cacheReadTokens * fallback.cacheRead;
     return inputCost + outputCost + cacheCost;
   }
 
@@ -165,12 +156,16 @@ export async function calculateCost(model: string, inputTokens: number, outputTo
   return inputTokens * (3 / 1e6) + outputTokens * (15 / 1e6) + cacheCost;
 }
 
-export async function calculateCostBatch(
-  records: { model: string; input_tokens: number; output_tokens: number; cache_create_tokens?: number; cache_read_tokens?: number }[]
+/**
+ * Calculate cost for a single record (async version - fetches pricing if needed).
+ */
+export async function calculateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreateTokens: number = 0,
+  cacheReadTokens: number = 0,
 ): Promise<number> {
-  let total = 0;
-  for (const r of records) {
-    total += await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens || 0, r.cache_read_tokens || 0);
-  }
-  return total;
+  const pricing = await fetchPricing();
+  return calculateCostWithPricing(pricing, model, inputTokens, outputTokens, cacheCreateTokens, cacheReadTokens);
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import getDb from '@/lib/db';
-import { calculateCost } from '@/lib/pricing';
+import { fetchPricing, calculateCostWithPricing } from '@/lib/pricing';
 
 // Supported intervals in minutes
 type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d';
@@ -200,6 +200,7 @@ export async function GET(request: NextRequest) {
   }
 
   const granularity = effectiveInterval === '1d' ? 'daily' : 'minute';
+  const intervalSeconds = getIntervalMinutes(effectiveInterval) * 60;
 
   const db = getDb();
   const hasDevice = !!deviceParam;
@@ -291,92 +292,72 @@ export async function GET(request: NextRequest) {
     ORDER BY total_tokens DESC
   `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number; record_count: number }[];
 
-  // Calculate costs per model for totalStats
-  const modelTokensForCost = db.prepare(`
-    SELECT model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens, SUM(cache_create_tokens) as cache_create_tokens, SUM(cache_read_tokens) as cache_read_tokens
-    FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
-      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
-    GROUP BY model
-  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[];
+  // ---- Cost calculation: per-record to match ccusage CLI behavior ----
+  // Fetch pricing once, then calculate cost per individual record
+  const pricing = await fetchPricing();
 
-  let totalCost = 0;
-  for (const r of modelTokensForCost) {
-    totalCost += await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
-  }
-
-  // Calculate cost per device
-  const deviceModelTokens = db.prepare(`
-    SELECT device_name, model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens, SUM(cache_create_tokens) as cache_create_tokens, SUM(cache_read_tokens) as cache_read_tokens
+  // Query all individual records for cost calculation (with bucket timestamp for trend cost)
+  const costRecords = db.prepare(`
+    SELECT
+      model, device_name, input_tokens, output_tokens, cache_create_tokens, cache_read_tokens,
+      (timestamp / ${intervalSeconds}) * ${intervalSeconds} as bucket_ts
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ?
       AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
-    GROUP BY device_name, model
-  `).all(startTime, endTime) as { device_name: string; model: string; input_tokens: number; output_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[];
+  `).all(startTime, endTime) as {
+    model: string; device_name: string;
+    input_tokens: number; output_tokens: number;
+    cache_create_tokens: number; cache_read_tokens: number;
+    bucket_ts: number;
+  }[];
 
+  // Calculate per-record cost and aggregate into different views
+  let totalCost = 0;
   const deviceCostMap = new Map<string, number>();
-  for (const r of deviceModelTokens) {
-    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
+  const modelCostMap = new Map<string, number>();
+  const trendCostMap = new Map<number, number>();
+  const modelTrendCostMap = new Map<string, number>(); // "bucket_ts-model" -> cost
+
+  for (const r of costRecords) {
+    const cost = calculateCostWithPricing(pricing, r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
+
+    // Per-device cost (unfiltered by device)
     deviceCostMap.set(r.device_name, (deviceCostMap.get(r.device_name) || 0) + cost);
+
+    // Apply device filter for total, per-model, trend costs
+    if (hasDevice && r.device_name !== deviceParam) continue;
+
+    totalCost += cost;
+    modelCostMap.set(r.model, (modelCostMap.get(r.model) || 0) + cost);
+    trendCostMap.set(r.bucket_ts, (trendCostMap.get(r.bucket_ts) || 0) + cost);
+
+    const mtKey = `${r.bucket_ts}-${r.model}`;
+    modelTrendCostMap.set(mtKey, (modelTrendCostMap.get(mtKey) || 0) + cost);
   }
 
+  // Attach costs to device stats
   const deviceStatsWithCost = (deviceStats as any[]).map(d => ({
     ...d,
     cost: deviceCostMap.get(d.device_name) || 0,
   }));
 
-  // Calculate cost per model
-  const modelStatsWithCost = await Promise.all(
-    modelStats.map(async (m) => ({
-      ...m,
-      cost: await calculateCost(m.model, m.input_tokens, m.output_tokens, m.cache_create_tokens, m.cache_read_tokens),
-    }))
-  );
+  // Attach costs to model stats
+  const modelStatsWithCost = modelStats.map(m => ({
+    ...m,
+    cost: modelCostMap.get(m.model) || 0,
+  }));
 
-  // Calculate cost for trend data - query per-model per-bucket
-  const trendCostQuery = buildTrendQuery(effectiveInterval, hasDevice).replace(
-    'SUM(total_tokens) as total_tokens',
-    'SUM(total_tokens) as total_tokens, model'
-  ).replace(
-    /GROUP BY \(timestamp \/ \d+\)/,
-    '$&, model'
-  );
-
-  // Simpler approach: query model breakdown per time bucket
-  const intervalSeconds = getIntervalMinutes(effectiveInterval) * 60;
-  const trendModelData = db.prepare(`
-    SELECT
-      (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
-      model,
-      SUM(input_tokens) as input_tokens,
-      SUM(output_tokens) as output_tokens,
-      SUM(cache_create_tokens) as cache_create_tokens,
-      SUM(cache_read_tokens) as cache_read_tokens
-    FROM usage_records
-    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
-      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
-    GROUP BY (timestamp / ${intervalSeconds}), model
-    ORDER BY timestamp ASC
-  `).all(...baseParams) as { timestamp: number; model: string; input_tokens: number; output_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[];
-
-  const trendCostMap = new Map<number, number>();
-  for (const r of trendModelData) {
-    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
-    trendCostMap.set(r.timestamp, (trendCostMap.get(r.timestamp) || 0) + cost);
-  }
-
+  // Attach costs to trend data
   const trendDataWithCost = trendData.map(d => ({
     ...d,
     cost: trendCostMap.get(d.timestamp) || 0,
   }));
 
-  // Calculate cost for model trend data
-  const modelTrendWithCost = await Promise.all(
-    modelTrendRaw.map(async (d) => ({
-      ...d,
-      cost: await calculateCost(d.model, d.input_tokens, d.output_tokens, d.cache_create_tokens, d.cache_read_tokens),
-    }))
-  );
+  // Attach costs to model trend data
+  const modelTrendWithCost = modelTrendRaw.map(d => ({
+    ...d,
+    cost: modelTrendCostMap.get(`${d.timestamp}-${d.model}`) || 0,
+  }));
 
   return NextResponse.json({
     totalStats: {
