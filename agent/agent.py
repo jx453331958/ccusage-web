@@ -434,7 +434,7 @@ Examples:
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Initial collection
-    collect_and_report(config, state, quiet=args.once)
+    collect_and_report(config, state)
 
     if args.once:
         state.save()

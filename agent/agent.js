@@ -420,14 +420,10 @@ async function run() {
   loadState();
 
   async function collect() {
-    if (!runOnce) {
-      console.log(`[${new Date().toLocaleTimeString()}] Collecting usage data...`);
-    }
+    console.log(`[${new Date().toLocaleTimeString()}] Collecting usage data...`);
 
     const files = findJsonlFiles();
-    if (!runOnce) {
-      console.log(`Found ${files.length} JSONL files`);
-    }
+    console.log(`Found ${files.length} JSONL files`);
 
     let allRecords = [];
     for (const file of files) {
@@ -435,15 +431,11 @@ async function run() {
       allRecords = allRecords.concat(records);
     }
 
-    if (!runOnce) {
-      console.log(`Collected ${allRecords.length} new records`);
-    }
-    
+    console.log(`Collected ${allRecords.length} new records`);
+
     await reportUsage(allRecords);
-    
-    if (!runOnce) {
-      console.log('---');
-    }
+
+    console.log('---');
   }
 
   // Initial collection
