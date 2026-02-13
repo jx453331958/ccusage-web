@@ -21,6 +21,8 @@ function getDatabase(): Database.Database {
 
     // Enable WAL mode for better concurrent access
     db.pragma('journal_mode = WAL');
+    // Wait up to 5 seconds when database is locked instead of failing immediately
+    db.pragma('busy_timeout = 5000');
 
     // Initialize schema on first access
     initializeDatabase();

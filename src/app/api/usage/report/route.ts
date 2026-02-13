@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
       skipped,
     });
   } catch (error) {
-    console.error('Error reporting usage:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Error reporting usage:', message);
+    return NextResponse.json({ error: `Internal server error: ${message}` }, { status: 500 });
   }
 }
