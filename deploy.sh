@@ -151,8 +151,14 @@ status() {
 backup() {
     BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).db"
     if [ -f data/ccusage.db ]; then
-        cp data/ccusage.db "data/$BACKUP_FILE"
-        print_info "Database backed up to: data/$BACKUP_FILE"
+        if cp data/ccusage.db "data/$BACKUP_FILE" 2>/dev/null; then
+            print_info "Database backed up to: data/$BACKUP_FILE"
+        elif sudo cp data/ccusage.db "data/$BACKUP_FILE"; then
+            print_info "Database backed up to: data/$BACKUP_FILE (via sudo)"
+        else
+            print_error "Failed to backup database (permission denied)"
+            exit 1
+        fi
     else
         print_warn "No database file found to backup"
     fi
@@ -177,12 +183,24 @@ reset_db() {
     # Backup existing database
     if [ -f data/ccusage.db ]; then
         BACKUP_FILE="backup_before_reset_$(date +%Y%m%d_%H%M%S).db"
-        cp data/ccusage.db "data/$BACKUP_FILE"
-        print_info "Database backed up to: data/$BACKUP_FILE"
+        if cp data/ccusage.db "data/$BACKUP_FILE" 2>/dev/null; then
+            print_info "Database backed up to: data/$BACKUP_FILE"
+        elif sudo cp data/ccusage.db "data/$BACKUP_FILE"; then
+            print_info "Database backed up to: data/$BACKUP_FILE (via sudo)"
+        else
+            print_error "Failed to backup database"
+            exit 1
+        fi
 
         # Remove database files
-        rm -f data/ccusage.db data/ccusage.db-wal data/ccusage.db-shm
-        print_info "Database deleted"
+        if rm -f data/ccusage.db data/ccusage.db-wal data/ccusage.db-shm 2>/dev/null; then
+            print_info "Database deleted"
+        elif sudo rm -f data/ccusage.db data/ccusage.db-wal data/ccusage.db-shm; then
+            print_info "Database deleted (via sudo)"
+        else
+            print_error "Failed to delete database"
+            exit 1
+        fi
     else
         print_warn "No database file found"
     fi
