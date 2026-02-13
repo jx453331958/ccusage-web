@@ -5,6 +5,8 @@ interface PricingEntry {
   output_cost_per_token?: number;
   input_cost_per_token_above_128k_tokens?: number;
   output_cost_per_token_above_128k_tokens?: number;
+  cache_creation_input_token_cost?: number;
+  cache_read_input_token_cost?: number;
 }
 
 interface PricingData {
@@ -16,14 +18,14 @@ let cacheTimestamp = 0;
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Fallback prices per token (USD) for common Claude models
-const FALLBACK_PRICING: Record<string, { input: number; output: number; inputAbove128k?: number; outputAbove128k?: number }> = {
-  'claude-opus-4': { input: 15 / 1e6, output: 75 / 1e6, inputAbove128k: 15 / 1e6, outputAbove128k: 75 / 1e6 },
-  'claude-sonnet-4': { input: 3 / 1e6, output: 15 / 1e6, inputAbove128k: 3 / 1e6, outputAbove128k: 15 / 1e6 },
-  'claude-3.5-sonnet': { input: 3 / 1e6, output: 15 / 1e6, inputAbove128k: 3 / 1e6, outputAbove128k: 15 / 1e6 },
-  'claude-3.5-haiku': { input: 0.8 / 1e6, output: 4 / 1e6, inputAbove128k: 1 / 1e6, outputAbove128k: 5 / 1e6 },
-  'claude-3-opus': { input: 15 / 1e6, output: 75 / 1e6, inputAbove128k: 15 / 1e6, outputAbove128k: 75 / 1e6 },
-  'claude-3-sonnet': { input: 3 / 1e6, output: 15 / 1e6 },
-  'claude-3-haiku': { input: 0.25 / 1e6, output: 1.25 / 1e6 },
+const FALLBACK_PRICING: Record<string, { input: number; output: number; inputAbove128k?: number; outputAbove128k?: number; cacheWrite?: number; cacheRead?: number }> = {
+  'claude-opus-4': { input: 15 / 1e6, output: 75 / 1e6, inputAbove128k: 15 / 1e6, outputAbove128k: 75 / 1e6, cacheWrite: 18.75 / 1e6, cacheRead: 1.875 / 1e6 },
+  'claude-sonnet-4': { input: 3 / 1e6, output: 15 / 1e6, inputAbove128k: 3 / 1e6, outputAbove128k: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
+  'claude-3.5-sonnet': { input: 3 / 1e6, output: 15 / 1e6, inputAbove128k: 3 / 1e6, outputAbove128k: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
+  'claude-3.5-haiku': { input: 0.8 / 1e6, output: 4 / 1e6, inputAbove128k: 1 / 1e6, outputAbove128k: 5 / 1e6, cacheWrite: 1.50 / 1e6, cacheRead: 0.10 / 1e6 },
+  'claude-3-opus': { input: 15 / 1e6, output: 75 / 1e6, inputAbove128k: 15 / 1e6, outputAbove128k: 75 / 1e6, cacheWrite: 18.75 / 1e6, cacheRead: 1.875 / 1e6 },
+  'claude-3-sonnet': { input: 3 / 1e6, output: 15 / 1e6, cacheWrite: 4.50 / 1e6, cacheRead: 0.375 / 1e6 },
+  'claude-3-haiku': { input: 0.25 / 1e6, output: 1.25 / 1e6, cacheWrite: 1.50 / 1e6, cacheRead: 0.10 / 1e6 },
 };
 
 async function fetchPricing(): Promise<PricingData> {
@@ -82,7 +84,7 @@ function findPricing(pricing: PricingData, model: string): PricingEntry | null {
   return null;
 }
 
-function findFallback(model: string): { input: number; output: number; inputAbove128k?: number; outputAbove128k?: number } | null {
+function findFallback(model: string): { input: number; output: number; inputAbove128k?: number; outputAbove128k?: number; cacheWrite?: number; cacheRead?: number } | null {
   // Try prefix matching against fallback keys
   for (const [key, value] of Object.entries(FALLBACK_PRICING)) {
     if (model.startsWith(key) || model.includes(key)) {
@@ -101,7 +103,7 @@ function findFallback(model: string): { input: number; output: number; inputAbov
 
 const TIER_THRESHOLD = 200000; // 200k tokens
 
-export async function calculateCost(model: string, inputTokens: number, outputTokens: number): Promise<number> {
+export async function calculateCost(model: string, inputTokens: number, outputTokens: number, cacheCreateTokens: number = 0, cacheReadTokens: number = 0): Promise<number> {
   const pricing = await fetchPricing();
   const entry = findPricing(pricing, model);
 
@@ -126,7 +128,16 @@ export async function calculateCost(model: string, inputTokens: number, outputTo
       outputCost = outputTokens * entry.output_cost_per_token;
     }
 
-    return inputCost + outputCost;
+    // Cache costs from LiteLLM pricing
+    let cacheCost = 0;
+    if (entry.cache_creation_input_token_cost && cacheCreateTokens > 0) {
+      cacheCost += cacheCreateTokens * entry.cache_creation_input_token_cost;
+    }
+    if (entry.cache_read_input_token_cost && cacheReadTokens > 0) {
+      cacheCost += cacheReadTokens * entry.cache_read_input_token_cost;
+    }
+
+    return inputCost + outputCost + cacheCost;
   }
 
   // Fallback
@@ -147,19 +158,31 @@ export async function calculateCost(model: string, inputTokens: number, outputTo
       outputCost = outputTokens * fallback.output;
     }
 
-    return inputCost + outputCost;
+    // Cache costs from fallback
+    let cacheCost = 0;
+    if (fallback.cacheWrite && cacheCreateTokens > 0) {
+      cacheCost += cacheCreateTokens * fallback.cacheWrite;
+    }
+    if (fallback.cacheRead && cacheReadTokens > 0) {
+      cacheCost += cacheReadTokens * fallback.cacheRead;
+    }
+
+    return inputCost + outputCost + cacheCost;
   }
 
   // Unknown model - use sonnet pricing as default
-  return inputTokens * (3 / 1e6) + outputTokens * (15 / 1e6);
+  let cacheCost = 0;
+  if (cacheCreateTokens > 0) cacheCost += cacheCreateTokens * (4.50 / 1e6);
+  if (cacheReadTokens > 0) cacheCost += cacheReadTokens * (0.375 / 1e6);
+  return inputTokens * (3 / 1e6) + outputTokens * (15 / 1e6) + cacheCost;
 }
 
 export async function calculateCostBatch(
-  records: { model: string; input_tokens: number; output_tokens: number }[]
+  records: { model: string; input_tokens: number; output_tokens: number; cache_create_tokens?: number; cache_read_tokens?: number }[]
 ): Promise<number> {
   let total = 0;
   for (const r of records) {
-    total += await calculateCost(r.model, r.input_tokens, r.output_tokens);
+    total += await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens || 0, r.cache_read_tokens || 0);
   }
   return total;
 }

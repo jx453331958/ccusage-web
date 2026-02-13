@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpRight, ArrowDownLeft, Activity, DollarSign } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Activity, DollarSign, Database, BookOpen } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 
 function formatCost(cost: number): string {
@@ -17,6 +17,8 @@ interface StatsOverviewProps {
     totalInput: number;
     totalOutput: number;
     totalTokens: number;
+    totalCacheCreate: number;
+    totalCacheRead: number;
     totalRecords: number;
     totalCost: number;
   };
@@ -26,7 +28,7 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
   const t = useTranslations('dashboard.stats');
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t('totalTokens')}</CardTitle>
@@ -68,6 +70,28 @@ export default function StatsOverview({ stats }: StatsOverviewProps) {
         <CardContent>
           <div className="text-2xl font-bold">{formatNumber(stats.totalRecords)}</div>
           <p className="text-xs text-muted-foreground">{t('usageReports')}</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{t('cacheWrite')}</CardTitle>
+          <Database className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatNumber(stats.totalCacheCreate)}</div>
+          <p className="text-xs text-muted-foreground">{t('cacheWriteTokens')}</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{t('cacheRead')}</CardTitle>
+          <BookOpen className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{formatNumber(stats.totalCacheRead)}</div>
+          <p className="text-xs text-muted-foreground">{t('cacheReadTokens')}</p>
         </CardContent>
       </Card>
 

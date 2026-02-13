@@ -20,6 +20,8 @@ interface TrendData {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  cache_create_tokens: number;
+  cache_read_tokens: number;
   cost?: number;
 }
 
@@ -29,6 +31,8 @@ interface ModelTrendData {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  cache_create_tokens: number;
+  cache_read_tokens: number;
   cost?: number;
 }
 
@@ -149,7 +153,7 @@ export default function UsageTrend({
         },
       },
       legend: {
-        data: [t('inputTokens'), t('outputTokens'), t('totalTokens'), t('cost')],
+        data: [t('inputTokens'), t('outputTokens'), t('totalTokens'), t('cacheWrite'), t('cacheRead'), t('cost')],
         bottom: 0,
         textStyle: { color: textColor },
       },
@@ -224,6 +228,22 @@ export default function UsageTrend({
           data: filteredData.map((d) => d.total_tokens),
           smooth: true,
           itemStyle: { color: isDark ? '#a78bfa' : '#8b5cf6' },
+        },
+        {
+          name: t('cacheWrite'),
+          type: 'line',
+          yAxisIndex: 0,
+          data: filteredData.map((d) => d.cache_create_tokens || 0),
+          smooth: true,
+          itemStyle: { color: isDark ? '#f97316' : '#ea580c' },
+        },
+        {
+          name: t('cacheRead'),
+          type: 'line',
+          yAxisIndex: 0,
+          data: filteredData.map((d) => d.cache_read_tokens || 0),
+          smooth: true,
+          itemStyle: { color: isDark ? '#c084fc' : '#9333ea' },
         },
         {
           name: t('cost'),

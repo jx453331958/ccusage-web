@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
     const db = getDb();
     // Insert records in a transaction
     const insert = db.prepare(`
-      INSERT INTO usage_records (api_key_id, device_name, input_tokens, output_tokens, total_tokens, session_id, model, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO usage_records (api_key_id, device_name, input_tokens, output_tokens, total_tokens, cache_create_tokens, cache_read_tokens, session_id, model, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertMany = db.transaction((records: any[]) => {
@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
           record.input_tokens || 0,
           record.output_tokens || 0,
           record.total_tokens || 0,
+          record.cache_create_tokens || 0,
+          record.cache_read_tokens || 0,
           record.session_id || null,
           record.model || 'unknown',
           record.timestamp

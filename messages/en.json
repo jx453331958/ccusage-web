@@ -56,7 +56,11 @@
       "usageReports": "Usage reports",
       "estimatedCost": "Estimated Cost",
       "basedOnApiPricing": "Based on API pricing",
-      "cost": "Cost"
+      "cost": "Cost",
+      "cacheWrite": "Cache Write",
+      "cacheRead": "Cache Read",
+      "cacheWriteTokens": "Cache write tokens",
+      "cacheReadTokens": "Cache read tokens"
     },
     "apiKeys": {
       "title": "API Keys",
@@ -96,6 +100,8 @@
       "viewByModel": "By Model",
       "unknownModel": "Unknown",
       "cost": "Cost",
+      "cacheWrite": "Cache Write",
+      "cacheRead": "Cache Read",
       "showZeroValues": "Show zero values",
       "zoomHint": "Drag the slider below to zoom, or scroll in the chart area",
       "interval": {
@@ -123,6 +129,8 @@
       "lastReport": "Last report",
       "in": "in",
       "out": "out",
+      "cacheWrite": "cache write",
+      "cacheRead": "cache read",
       "allDevices": "All Devices"
     }
   },

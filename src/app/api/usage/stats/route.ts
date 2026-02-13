@@ -28,7 +28,9 @@ function buildTrendQuery(interval: Interval, hasDevice: boolean): string {
       (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
       SUM(input_tokens) as input_tokens,
       SUM(output_tokens) as output_tokens,
-      SUM(total_tokens) as total_tokens
+      SUM(total_tokens) as total_tokens,
+      SUM(cache_create_tokens) as cache_create_tokens,
+      SUM(cache_read_tokens) as cache_read_tokens
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
     GROUP BY (timestamp / ${intervalSeconds})
@@ -38,30 +40,28 @@ function buildTrendQuery(interval: Interval, hasDevice: boolean): string {
 
 // Generate complete time series with empty data points filled
 function generateCompleteTimeSeries(
-  trendData: { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number }[],
+  trendData: { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[],
   startTime: number,
   endTime: number,
   interval: Interval
-): { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number }[] {
+): { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[] {
   const intervalSeconds = getIntervalMinutes(interval) * 60;
 
-  // Align start time to interval boundary
   const alignedStart = Math.floor(startTime / intervalSeconds) * intervalSeconds;
-  // For end time, use current time but don't exceed it
   const alignedEnd = Math.floor(endTime / intervalSeconds) * intervalSeconds;
 
-  // Create a map for quick lookup
-  const dataMap = new Map<number, { input_tokens: number; output_tokens: number; total_tokens: number }>();
+  const dataMap = new Map<number, { input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }>();
   for (const item of trendData) {
     dataMap.set(item.timestamp, {
       input_tokens: item.input_tokens,
       output_tokens: item.output_tokens,
       total_tokens: item.total_tokens,
+      cache_create_tokens: item.cache_create_tokens,
+      cache_read_tokens: item.cache_read_tokens,
     });
   }
 
-  // Generate complete time series
-  const result: { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number }[] = [];
+  const result: { timestamp: number; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[] = [];
   for (let ts = alignedStart; ts <= alignedEnd; ts += intervalSeconds) {
     const data = dataMap.get(ts);
     result.push({
@@ -69,6 +69,8 @@ function generateCompleteTimeSeries(
       input_tokens: data?.input_tokens || 0,
       output_tokens: data?.output_tokens || 0,
       total_tokens: data?.total_tokens || 0,
+      cache_create_tokens: data?.cache_create_tokens || 0,
+      cache_read_tokens: data?.cache_read_tokens || 0,
     });
   }
 
@@ -77,33 +79,31 @@ function generateCompleteTimeSeries(
 
 // Generate complete time series for model trend data
 function generateCompleteModelTimeSeries(
-  modelTrendData: { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number }[],
+  modelTrendData: { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[],
   startTime: number,
   endTime: number,
   interval: Interval
-): { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number }[] {
+): { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[] {
   const intervalSeconds = getIntervalMinutes(interval) * 60;
 
-  // Align start time to interval boundary
   const alignedStart = Math.floor(startTime / intervalSeconds) * intervalSeconds;
   const alignedEnd = Math.floor(endTime / intervalSeconds) * intervalSeconds;
 
-  // Get all unique models
   const models = [...new Set(modelTrendData.map(d => d.model))];
 
-  // Create a map for quick lookup: "timestamp-model" -> data
-  const dataMap = new Map<string, { input_tokens: number; output_tokens: number; total_tokens: number }>();
+  const dataMap = new Map<string, { input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }>();
   for (const item of modelTrendData) {
     const key = `${item.timestamp}-${item.model}`;
     dataMap.set(key, {
       input_tokens: item.input_tokens,
       output_tokens: item.output_tokens,
       total_tokens: item.total_tokens,
+      cache_create_tokens: item.cache_create_tokens,
+      cache_read_tokens: item.cache_read_tokens,
     });
   }
 
-  // Generate complete time series for each model
-  const result: { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number }[] = [];
+  const result: { timestamp: number; model: string; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[] = [];
   for (let ts = alignedStart; ts <= alignedEnd; ts += intervalSeconds) {
     for (const model of models) {
       const key = `${ts}-${model}`;
@@ -114,6 +114,8 @@ function generateCompleteModelTimeSeries(
         input_tokens: data?.input_tokens || 0,
         output_tokens: data?.output_tokens || 0,
         total_tokens: data?.total_tokens || 0,
+        cache_create_tokens: data?.cache_create_tokens || 0,
+        cache_read_tokens: data?.cache_read_tokens || 0,
       });
     }
   }
@@ -132,7 +134,9 @@ function buildModelTrendQuery(interval: Interval, hasDevice: boolean): string {
       model,
       SUM(input_tokens) as input_tokens,
       SUM(output_tokens) as output_tokens,
-      SUM(total_tokens) as total_tokens
+      SUM(total_tokens) as total_tokens,
+      SUM(cache_create_tokens) as cache_create_tokens,
+      SUM(cache_read_tokens) as cache_read_tokens
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
       AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
@@ -217,10 +221,12 @@ export async function GET(request: NextRequest) {
       SUM(input_tokens) as total_input,
       SUM(output_tokens) as total_output,
       SUM(total_tokens) as total_tokens,
+      SUM(cache_create_tokens) as total_cache_create,
+      SUM(cache_read_tokens) as total_cache_read,
       COUNT(*) as total_records
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
-  `).get(...baseParams) as { total_input: number; total_output: number; total_tokens: number; total_records: number };
+  `).get(...baseParams) as { total_input: number; total_output: number; total_tokens: number; total_cache_create: number; total_cache_read: number; total_records: number };
 
   // Get per-device stats (always show all devices for the selector)
   const deviceStats = db.prepare(`
@@ -229,6 +235,8 @@ export async function GET(request: NextRequest) {
       SUM(input_tokens) as input_tokens,
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens,
+      SUM(cache_create_tokens) as cache_create_tokens,
+      SUM(cache_read_tokens) as cache_read_tokens,
       COUNT(*) as record_count,
       MAX(timestamp) as last_report
     FROM usage_records
@@ -244,6 +252,8 @@ export async function GET(request: NextRequest) {
     input_tokens: number;
     output_tokens: number;
     total_tokens: number;
+    cache_create_tokens: number;
+    cache_read_tokens: number;
   }[];
 
   // Fill in missing time points with zero values
@@ -257,6 +267,8 @@ export async function GET(request: NextRequest) {
     input_tokens: number;
     output_tokens: number;
     total_tokens: number;
+    cache_create_tokens: number;
+    cache_read_tokens: number;
   }[];
 
   // Fill in missing time points for model trend data
@@ -269,40 +281,42 @@ export async function GET(request: NextRequest) {
       SUM(input_tokens) as input_tokens,
       SUM(output_tokens) as output_tokens,
       SUM(total_tokens) as total_tokens,
+      SUM(cache_create_tokens) as cache_create_tokens,
+      SUM(cache_read_tokens) as cache_read_tokens,
       COUNT(*) as record_count
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
       AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
     GROUP BY model
     ORDER BY total_tokens DESC
-  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
+  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; cache_create_tokens: number; cache_read_tokens: number; record_count: number }[];
 
   // Calculate costs per model for totalStats
   const modelTokensForCost = db.prepare(`
-    SELECT model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
+    SELECT model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens, SUM(cache_create_tokens) as cache_create_tokens, SUM(cache_read_tokens) as cache_read_tokens
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
       AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
     GROUP BY model
-  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number }[];
+  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[];
 
   let totalCost = 0;
   for (const r of modelTokensForCost) {
-    totalCost += await calculateCost(r.model, r.input_tokens, r.output_tokens);
+    totalCost += await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
   }
 
   // Calculate cost per device
   const deviceModelTokens = db.prepare(`
-    SELECT device_name, model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
+    SELECT device_name, model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens, SUM(cache_create_tokens) as cache_create_tokens, SUM(cache_read_tokens) as cache_read_tokens
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ?
       AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
     GROUP BY device_name, model
-  `).all(startTime, endTime) as { device_name: string; model: string; input_tokens: number; output_tokens: number }[];
+  `).all(startTime, endTime) as { device_name: string; model: string; input_tokens: number; output_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[];
 
   const deviceCostMap = new Map<string, number>();
   for (const r of deviceModelTokens) {
-    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens);
+    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
     deviceCostMap.set(r.device_name, (deviceCostMap.get(r.device_name) || 0) + cost);
   }
 
@@ -315,7 +329,7 @@ export async function GET(request: NextRequest) {
   const modelStatsWithCost = await Promise.all(
     modelStats.map(async (m) => ({
       ...m,
-      cost: await calculateCost(m.model, m.input_tokens, m.output_tokens),
+      cost: await calculateCost(m.model, m.input_tokens, m.output_tokens, m.cache_create_tokens, m.cache_read_tokens),
     }))
   );
 
@@ -335,17 +349,19 @@ export async function GET(request: NextRequest) {
       (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
       model,
       SUM(input_tokens) as input_tokens,
-      SUM(output_tokens) as output_tokens
+      SUM(output_tokens) as output_tokens,
+      SUM(cache_create_tokens) as cache_create_tokens,
+      SUM(cache_read_tokens) as cache_read_tokens
     FROM usage_records
     WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
       AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
     GROUP BY (timestamp / ${intervalSeconds}), model
     ORDER BY timestamp ASC
-  `).all(...baseParams) as { timestamp: number; model: string; input_tokens: number; output_tokens: number }[];
+  `).all(...baseParams) as { timestamp: number; model: string; input_tokens: number; output_tokens: number; cache_create_tokens: number; cache_read_tokens: number }[];
 
   const trendCostMap = new Map<number, number>();
   for (const r of trendModelData) {
-    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens);
+    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens, r.cache_create_tokens, r.cache_read_tokens);
     trendCostMap.set(r.timestamp, (trendCostMap.get(r.timestamp) || 0) + cost);
   }
 
@@ -358,7 +374,7 @@ export async function GET(request: NextRequest) {
   const modelTrendWithCost = await Promise.all(
     modelTrendRaw.map(async (d) => ({
       ...d,
-      cost: await calculateCost(d.model, d.input_tokens, d.output_tokens),
+      cost: await calculateCost(d.model, d.input_tokens, d.output_tokens, d.cache_create_tokens, d.cache_read_tokens),
     }))
   );
 
@@ -367,6 +383,8 @@ export async function GET(request: NextRequest) {
       totalInput: totalStats.total_input || 0,
       totalOutput: totalStats.total_output || 0,
       totalTokens: totalStats.total_tokens || 0,
+      totalCacheCreate: totalStats.total_cache_create || 0,
+      totalCacheRead: totalStats.total_cache_read || 0,
       totalRecords: totalStats.total_records || 0,
       totalCost,
     },

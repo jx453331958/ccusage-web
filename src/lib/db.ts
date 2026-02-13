@@ -75,6 +75,14 @@ function initializeDatabase() {
     database.exec(`ALTER TABLE usage_records ADD COLUMN model TEXT DEFAULT 'unknown'`);
   }
 
+  // Migration: Add cache token columns if they don't exist
+  const columnsAfterModel = database.prepare("PRAGMA table_info(usage_records)").all() as { name: string }[];
+  const hasCacheCreateColumn = columnsAfterModel.some((col) => col.name === 'cache_create_tokens');
+  if (!hasCacheCreateColumn) {
+    database.exec(`ALTER TABLE usage_records ADD COLUMN cache_create_tokens INTEGER DEFAULT 0`);
+    database.exec(`ALTER TABLE usage_records ADD COLUMN cache_read_tokens INTEGER DEFAULT 0`);
+  }
+
   // Settings table (for auto-generated secrets, etc.)
   database.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -142,6 +150,8 @@ export interface UsageRecord {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  cache_create_tokens: number;
+  cache_read_tokens: number;
   session_id: string | null;
   model: string;
   timestamp: number;

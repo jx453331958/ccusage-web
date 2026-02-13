@@ -10,6 +10,8 @@ interface Device {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  cache_create_tokens: number;
+  cache_read_tokens: number;
   record_count: number;
   last_report: number;
   cost?: number;
@@ -65,6 +67,11 @@ export default function DeviceList({ devices }: DeviceListProps) {
                   <div className="text-sm text-muted-foreground">
                     {formatNumber(device.input_tokens)} {t('in')} / {formatNumber(device.output_tokens)} {t('out')}
                   </div>
+                  {(device.cache_create_tokens > 0 || device.cache_read_tokens > 0) && (
+                    <div className="text-sm text-muted-foreground">
+                      {formatNumber(device.cache_create_tokens)} {t('cacheWrite')} / {formatNumber(device.cache_read_tokens)} {t('cacheRead')}
+                    </div>
+                  )}
                   {device.cost != null && device.cost > 0 && (
                     <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
                       {formatCost(device.cost)}

@@ -213,6 +213,8 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
 
                     input_tokens = usage.get('input_tokens') or usage.get('inputTokens') or 0
                     output_tokens = usage.get('output_tokens') or usage.get('outputTokens') or 0
+                    cache_create_tokens = usage.get('cache_creation_input_tokens') or usage.get('cache_creation') or 0
+                    cache_read_tokens = usage.get('cache_read_input_tokens') or usage.get('cache_read') or 0
 
                     # Skip empty usage
                     if input_tokens == 0 and output_tokens == 0:
@@ -235,7 +237,7 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
                         timestamp = int(time.time())
 
                     # Create unique record ID
-                    record_id = f'{file_path}:{timestamp}:{input_tokens}:{output_tokens}'
+                    record_id = f'{file_path}:{timestamp}:{input_tokens}:{output_tokens}:{cache_create_tokens}:{cache_read_tokens}'
 
                     # Skip if already reported
                     if state.is_reported(record_id):
@@ -245,6 +247,8 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
                         'input_tokens': input_tokens,
                         'output_tokens': output_tokens,
                         'total_tokens': input_tokens + output_tokens,
+                        'cache_create_tokens': cache_create_tokens,
+                        'cache_read_tokens': cache_read_tokens,
                         'session_id': entry.get('sessionId') or entry.get('session_id'),
                         'model': usage.get('model'),
                         'timestamp': timestamp,
@@ -275,6 +279,8 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
                 'input_tokens': r['input_tokens'],
                 'output_tokens': r['output_tokens'],
                 'total_tokens': r['total_tokens'],
+                'cache_create_tokens': r['cache_create_tokens'],
+                'cache_read_tokens': r['cache_read_tokens'],
                 'session_id': r['session_id'],
                 'model': r['model'],
                 'timestamp': r['timestamp'],

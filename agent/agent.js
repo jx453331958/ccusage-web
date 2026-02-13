@@ -293,6 +293,8 @@ function parseJsonlFile(filePath) {
         
         const inputTokens = usage.input_tokens || usage.inputTokens || 0;
         const outputTokens = usage.output_tokens || usage.outputTokens || 0;
+        const cacheCreateTokens = usage.cache_creation_input_tokens || usage.cache_creation || 0;
+        const cacheReadTokens = usage.cache_read_input_tokens || usage.cache_read || 0;
         
         // Skip empty usage
         if (inputTokens === 0 && outputTokens === 0) continue;
@@ -301,7 +303,7 @@ function parseJsonlFile(filePath) {
         const timestamp = entry.timestamp 
           ? Math.floor(new Date(entry.timestamp).getTime() / 1000) 
           : Math.floor(Date.now() / 1000);
-        const recordId = `${filePath}:${timestamp}:${inputTokens}:${outputTokens}`;
+        const recordId = `${filePath}:${timestamp}:${inputTokens}:${outputTokens}:${cacheCreateTokens}:${cacheReadTokens}`;
 
         // Skip if already reported
         if (state.reportedRecords.has(recordId)) {
@@ -312,6 +314,8 @@ function parseJsonlFile(filePath) {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
           total_tokens: inputTokens + outputTokens,
+          cache_create_tokens: cacheCreateTokens,
+          cache_read_tokens: cacheReadTokens,
           session_id: entry.sessionId || entry.session_id || null,
           model: usage.model || null,
           timestamp: timestamp,
@@ -367,6 +371,8 @@ async function reportUsage(records) {
           input_tokens: r.input_tokens,
           output_tokens: r.output_tokens,
           total_tokens: r.total_tokens,
+          cache_create_tokens: r.cache_create_tokens,
+          cache_read_tokens: r.cache_read_tokens,
           session_id: r.session_id,
           model: r.model,
           timestamp: r.timestamp,
