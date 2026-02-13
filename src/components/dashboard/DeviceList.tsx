@@ -12,6 +12,14 @@ interface Device {
   total_tokens: number;
   record_count: number;
   last_report: number;
+  cost?: number;
+}
+
+function formatCost(cost: number): string {
+  if (cost >= 1000) return `$${(cost / 1000).toFixed(1)}K`;
+  if (cost >= 1) return `$${cost.toFixed(2)}`;
+  if (cost >= 0.01) return `$${cost.toFixed(2)}`;
+  return `$${cost.toFixed(4)}`;
 }
 
 interface DeviceListProps {
@@ -57,6 +65,11 @@ export default function DeviceList({ devices }: DeviceListProps) {
                   <div className="text-sm text-muted-foreground">
                     {formatNumber(device.input_tokens)} {t('in')} / {formatNumber(device.output_tokens)} {t('out')}
                   </div>
+                  {device.cost != null && device.cost > 0 && (
+                    <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                      {formatCost(device.cost)}
+                    </div>
+                  )}
                 </div>
               </div>
             ))

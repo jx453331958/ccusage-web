@@ -20,6 +20,7 @@ interface TrendData {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  cost?: number;
 }
 
 interface ModelTrendData {
@@ -28,6 +29,7 @@ interface ModelTrendData {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
+  cost?: number;
 }
 
 interface UsageTrendProps {
@@ -73,6 +75,14 @@ function formatNumber(value: number): string {
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
   return String(value);
+}
+
+function formatCostValue(value: number): string {
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}K`;
+  if (value >= 1) return `$${value.toFixed(2)}`;
+  if (value >= 0.01) return `$${value.toFixed(2)}`;
+  if (value >= 0.001) return `$${value.toFixed(3)}`;
+  return `$${value.toFixed(4)}`;
 }
 
 type ViewMode = 'total' | 'model';
@@ -127,23 +137,25 @@ export default function UsageTrend({
           const timestamp = params[0]?.axisValue;
           let html = `<div style="font-weight:bold;margin-bottom:4px;color:${tooltipTextColor}">${formatFullTime(timestamp)}</div>`;
           params.forEach((p: any) => {
+            const isCost = p.seriesName === t('cost');
+            const displayValue = isCost ? formatCostValue(p.value) : formatNumber(p.value);
             html += `<div style="display:flex;align-items:center;gap:8px;color:${tooltipTextColor}">
               <span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%"></span>
               <span>${p.seriesName}:</span>
-              <span style="font-weight:bold">${formatNumber(p.value)}</span>
+              <span style="font-weight:bold">${displayValue}</span>
             </div>`;
           });
           return html;
         },
       },
       legend: {
-        data: [t('inputTokens'), t('outputTokens'), t('totalTokens')],
+        data: [t('inputTokens'), t('outputTokens'), t('totalTokens'), t('cost')],
         bottom: 0,
         textStyle: { color: textColor },
       },
       grid: {
         left: 60,
-        right: 20,
+        right: 70,
         top: 20,
         bottom: 80,
       },
@@ -155,14 +167,25 @@ export default function UsageTrend({
           color: textColor,
         },
       },
-      yAxis: {
-        type: 'value',
-        axisLabel: {
-          formatter: (value: number) => formatNumber(value),
-          color: textColor,
+      yAxis: [
+        {
+          type: 'value',
+          axisLabel: {
+            formatter: (value: number) => formatNumber(value),
+            color: textColor,
+          },
+          splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
         },
-        splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
-      },
+        {
+          type: 'value',
+          position: 'right',
+          axisLabel: {
+            formatter: (value: number) => formatCostValue(value),
+            color: isDark ? '#fbbf24' : '#d97706',
+          },
+          splitLine: { show: false },
+        },
+      ],
       dataZoom: [
         {
           type: 'inside',
@@ -181,6 +204,7 @@ export default function UsageTrend({
         {
           name: t('inputTokens'),
           type: 'line',
+          yAxisIndex: 0,
           data: filteredData.map((d) => d.input_tokens),
           smooth: true,
           itemStyle: { color: isDark ? '#6b9cf7' : '#3b82f6' },
@@ -188,6 +212,7 @@ export default function UsageTrend({
         {
           name: t('outputTokens'),
           type: 'line',
+          yAxisIndex: 0,
           data: filteredData.map((d) => d.output_tokens),
           smooth: true,
           itemStyle: { color: isDark ? '#4ec9a0' : '#10b981' },
@@ -195,9 +220,19 @@ export default function UsageTrend({
         {
           name: t('totalTokens'),
           type: 'line',
+          yAxisIndex: 0,
           data: filteredData.map((d) => d.total_tokens),
           smooth: true,
           itemStyle: { color: isDark ? '#a78bfa' : '#8b5cf6' },
+        },
+        {
+          name: t('cost'),
+          type: 'line',
+          yAxisIndex: 1,
+          data: filteredData.map((d) => d.cost || 0),
+          smooth: true,
+          itemStyle: { color: isDark ? '#fbbf24' : '#d97706' },
+          lineStyle: { type: 'dashed' },
         },
       ],
     };

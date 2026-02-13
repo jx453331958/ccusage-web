@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import getDb from '@/lib/db';
+import { calculateCost } from '@/lib/pricing';
 
 // Supported intervals in minutes
 type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d';
@@ -276,18 +277,104 @@ export async function GET(request: NextRequest) {
     ORDER BY total_tokens DESC
   `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number; total_tokens: number; record_count: number }[];
 
+  // Calculate costs per model for totalStats
+  const modelTokensForCost = db.prepare(`
+    SELECT model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
+    FROM usage_records
+    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
+      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
+    GROUP BY model
+  `).all(...baseParams) as { model: string; input_tokens: number; output_tokens: number }[];
+
+  let totalCost = 0;
+  for (const r of modelTokensForCost) {
+    totalCost += await calculateCost(r.model, r.input_tokens, r.output_tokens);
+  }
+
+  // Calculate cost per device
+  const deviceModelTokens = db.prepare(`
+    SELECT device_name, model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens
+    FROM usage_records
+    WHERE timestamp >= ? AND timestamp <= ?
+      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
+    GROUP BY device_name, model
+  `).all(startTime, endTime) as { device_name: string; model: string; input_tokens: number; output_tokens: number }[];
+
+  const deviceCostMap = new Map<string, number>();
+  for (const r of deviceModelTokens) {
+    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens);
+    deviceCostMap.set(r.device_name, (deviceCostMap.get(r.device_name) || 0) + cost);
+  }
+
+  const deviceStatsWithCost = (deviceStats as any[]).map(d => ({
+    ...d,
+    cost: deviceCostMap.get(d.device_name) || 0,
+  }));
+
+  // Calculate cost per model
+  const modelStatsWithCost = await Promise.all(
+    modelStats.map(async (m) => ({
+      ...m,
+      cost: await calculateCost(m.model, m.input_tokens, m.output_tokens),
+    }))
+  );
+
+  // Calculate cost for trend data - query per-model per-bucket
+  const trendCostQuery = buildTrendQuery(effectiveInterval, hasDevice).replace(
+    'SUM(total_tokens) as total_tokens',
+    'SUM(total_tokens) as total_tokens, model'
+  ).replace(
+    /GROUP BY \(timestamp \/ \d+\)/,
+    '$&, model'
+  );
+
+  // Simpler approach: query model breakdown per time bucket
+  const intervalSeconds = getIntervalMinutes(effectiveInterval) * 60;
+  const trendModelData = db.prepare(`
+    SELECT
+      (timestamp / ${intervalSeconds}) * ${intervalSeconds} as timestamp,
+      model,
+      SUM(input_tokens) as input_tokens,
+      SUM(output_tokens) as output_tokens
+    FROM usage_records
+    WHERE timestamp >= ? AND timestamp <= ? ${deviceFilter}
+      AND model IS NOT NULL AND model != '' AND LOWER(model) != 'unknown'
+    GROUP BY (timestamp / ${intervalSeconds}), model
+    ORDER BY timestamp ASC
+  `).all(...baseParams) as { timestamp: number; model: string; input_tokens: number; output_tokens: number }[];
+
+  const trendCostMap = new Map<number, number>();
+  for (const r of trendModelData) {
+    const cost = await calculateCost(r.model, r.input_tokens, r.output_tokens);
+    trendCostMap.set(r.timestamp, (trendCostMap.get(r.timestamp) || 0) + cost);
+  }
+
+  const trendDataWithCost = trendData.map(d => ({
+    ...d,
+    cost: trendCostMap.get(d.timestamp) || 0,
+  }));
+
+  // Calculate cost for model trend data
+  const modelTrendWithCost = await Promise.all(
+    modelTrendRaw.map(async (d) => ({
+      ...d,
+      cost: await calculateCost(d.model, d.input_tokens, d.output_tokens),
+    }))
+  );
+
   return NextResponse.json({
     totalStats: {
       totalInput: totalStats.total_input || 0,
       totalOutput: totalStats.total_output || 0,
       totalTokens: totalStats.total_tokens || 0,
       totalRecords: totalStats.total_records || 0,
+      totalCost,
     },
-    deviceStats,
+    deviceStats: deviceStatsWithCost,
     availableDevices: availableDevices.map(d => d.device_name),
-    trendData,
-    modelTrendData: modelTrendRaw,
-    modelStats,
+    trendData: trendDataWithCost,
+    modelTrendData: modelTrendWithCost,
+    modelStats: modelStatsWithCost,
     granularity,
     interval: effectiveInterval,
   });

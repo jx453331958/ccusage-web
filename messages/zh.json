@@ -53,7 +53,10 @@
       "combinedInputOutput": "输入和输出的总和",
       "sentToClaude": "发送给 Claude",
       "receivedFromClaude": "从 Claude 接收",
-      "usageReports": "使用报告"
+      "usageReports": "使用报告",
+      "estimatedCost": "预估费用",
+      "basedOnApiPricing": "基于 API 定价",
+      "cost": "费用"
     },
     "apiKeys": {
       "title": "API 密钥",
@@ -92,6 +95,7 @@
       "viewTotal": "总量",
       "viewByModel": "按模型",
       "unknownModel": "未知",
+      "cost": "费用",
       "showZeroValues": "显示零值",
       "zoomHint": "拖动下方滑块缩放，或在图表区域滚动",
       "interval": {

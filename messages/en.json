@@ -53,7 +53,10 @@
       "combinedInputOutput": "Combined input + output",
       "sentToClaude": "Sent to Claude",
       "receivedFromClaude": "Received from Claude",
-      "usageReports": "Usage reports"
+      "usageReports": "Usage reports",
+      "estimatedCost": "Estimated Cost",
+      "basedOnApiPricing": "Based on API pricing",
+      "cost": "Cost"
     },
     "apiKeys": {
       "title": "API Keys",
@@ -92,6 +95,7 @@
       "viewTotal": "Total",
       "viewByModel": "By Model",
       "unknownModel": "Unknown",
+      "cost": "Cost",
       "showZeroValues": "Show zero values",
       "zoomHint": "Drag the slider below to zoom, or scroll in the chart area",
       "interval": {
