@@ -280,54 +280,85 @@ export default function ApiKeyManager() {
             apiKeys.map((apiKey) => (
               <div
                 key={apiKey.id}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-accent gap-3"
+                className="p-4 border rounded-lg hover:bg-accent space-y-3"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-950/50 rounded-lg flex-shrink-0">
-                    <Key className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="p-2 bg-purple-100 dark:bg-purple-950/50 rounded-lg flex-shrink-0">
+                      <Key className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{apiKey.device_name}</div>
+                      <div className="text-sm text-muted-foreground truncate">
+                        {apiKey.key.substring(0, 20)}...
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1 break-words">
+                        {t('created')}: {formatDate(apiKey.created_at)}
+                        {apiKey.last_used_at && (
+                          <span className="block sm:inline"> • {t('lastUsed')}: {formatDate(apiKey.last_used_at)}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{apiKey.device_name}</div>
-                    <div className="text-sm text-muted-foreground truncate">
-                      {apiKey.key.substring(0, 20)}...
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 break-words">
-                      {t('created')}: {formatDate(apiKey.created_at)}
-                      {apiKey.last_used_at && (
-                        <span className="block sm:inline"> • {t('lastUsed')}: {formatDate(apiKey.last_used_at)}</span>
+                  <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setInstallDialogKey(apiKey)}
+                      title={t('installTitle')}
+                    >
+                      <Terminal className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(apiKey.key)}
+                      title={t('copyKey')}
+                    >
+                      {copiedKey === apiKey.key ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
                       )}
-                    </div>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteKey(apiKey.id)}
+                      title={t('delete')}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setInstallDialogKey(apiKey)}
-                    title={t('installTitle')}
-                  >
-                    <Terminal className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyToClipboard(apiKey.key)}
-                    title={t('copyKey')}
-                  >
-                    {copiedKey === apiKey.key ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDeleteKey(apiKey.id)}
-                    title={t('delete')}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  </Button>
+                {/* Inline quick-action buttons */}
+                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/50">
+                  {getCommands(apiKey.key).map((cmd) => {
+                    const Icon = cmd.icon;
+                    const quickId = `quick-${apiKey.id}-${cmd.id}`;
+                    const isQuickCopied = copiedCommandId === quickId;
+                    return (
+                      <button
+                        key={cmd.id}
+                        onClick={() => copyCommand(cmd.command, quickId)}
+                        title={t(cmd.descKey)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-all duration-200 ${
+                          isQuickCopied
+                            ? 'bg-green-100 dark:bg-green-950/50 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300'
+                            : cmd.id === 'uninstall'
+                              ? 'bg-background border-border/70 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-300 dark:hover:border-red-700'
+                              : 'bg-background border-border/70 text-muted-foreground hover:bg-accent hover:text-foreground hover:border-border'
+                        }`}
+                      >
+                        {isQuickCopied ? (
+                          <Check className="h-3 w-3" />
+                        ) : (
+                          <Icon className="h-3 w-3" />
+                        )}
+                        <span>{isQuickCopied ? t('copied') : t(cmd.labelKey)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))
