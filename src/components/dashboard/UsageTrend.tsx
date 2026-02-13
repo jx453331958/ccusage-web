@@ -52,6 +52,10 @@ const INTERVAL_OPTIONS: { value: Interval; labelKey: string }[] = [
   { value: '15m', labelKey: '15m' },
   { value: '30m', labelKey: '30m' },
   { value: '1h', labelKey: '1h' },
+  { value: '2h', labelKey: '2h' },
+  { value: '4h', labelKey: '4h' },
+  { value: '6h', labelKey: '6h' },
+  { value: '12h', labelKey: '12h' },
   { value: '1d', labelKey: '1d' },
 ];
 
@@ -65,6 +69,10 @@ function formatTime(timestamp: number, interval: string): string {
   const date = new Date(timestamp * 1000);
   if (interval === '1d') {
     return `${date.getMonth() + 1}/${date.getDate()}`;
+  }
+  // For multi-hour intervals, show date + hour
+  if (['2h', '4h', '6h', '12h'].includes(interval)) {
+    return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:00`;
   }
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -87,6 +95,16 @@ function formatCostValue(value: number): string {
 }
 
 type ViewMode = 'total' | 'model';
+type ModelMetric = 'total_tokens' | 'input_tokens' | 'output_tokens' | 'cache_create_tokens' | 'cache_read_tokens' | 'cost';
+
+const MODEL_METRIC_OPTIONS: { value: ModelMetric; labelKey: string }[] = [
+  { value: 'total_tokens', labelKey: 'totalTokens' },
+  { value: 'input_tokens', labelKey: 'inputTokens' },
+  { value: 'output_tokens', labelKey: 'outputTokens' },
+  { value: 'cache_create_tokens', labelKey: 'cacheWrite' },
+  { value: 'cache_read_tokens', labelKey: 'cacheRead' },
+  { value: 'cost', labelKey: 'cost' },
+];
 
 export default function UsageTrend({
   trendData,
@@ -100,6 +118,7 @@ export default function UsageTrend({
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('total');
+  const [modelMetric, setModelMetric] = useState<ModelMetric>('total_tokens');
   const [showZeroValues, setShowZeroValues] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -166,7 +185,10 @@ export default function UsageTrend({
         axisLabel: {
           formatter: (value: number) => formatTime(value, effectiveInterval),
           color: textColor,
+          rotate: timestamps.length > 20 ? 45 : 0,
+          interval: timestamps.length <= 31 ? 0 : 'auto',
         },
+        axisTick: { alignWithLabel: true },
       },
       yAxis: [
         {
@@ -208,6 +230,8 @@ export default function UsageTrend({
           yAxisIndex: 0,
           data: filteredData.map((d) => d.input_tokens),
           smooth: true,
+          showSymbol: timestamps.length <= 60,
+          symbolSize: timestamps.length <= 31 ? 6 : 4,
           itemStyle: { color: isDark ? '#6b9cf7' : '#3b82f6' },
         },
         {
@@ -216,6 +240,8 @@ export default function UsageTrend({
           yAxisIndex: 0,
           data: filteredData.map((d) => d.output_tokens),
           smooth: true,
+          showSymbol: timestamps.length <= 60,
+          symbolSize: timestamps.length <= 31 ? 6 : 4,
           itemStyle: { color: isDark ? '#4ec9a0' : '#10b981' },
         },
         {
@@ -224,6 +250,8 @@ export default function UsageTrend({
           yAxisIndex: 0,
           data: filteredData.map((d) => d.total_tokens),
           smooth: true,
+          showSymbol: timestamps.length <= 60,
+          symbolSize: timestamps.length <= 31 ? 6 : 4,
           itemStyle: { color: isDark ? '#a78bfa' : '#8b5cf6' },
         },
         {
@@ -232,6 +260,8 @@ export default function UsageTrend({
           yAxisIndex: 0,
           data: filteredData.map((d) => d.cache_create_tokens || 0),
           smooth: true,
+          showSymbol: timestamps.length <= 60,
+          symbolSize: timestamps.length <= 31 ? 6 : 4,
           itemStyle: { color: isDark ? '#f97316' : '#ea580c' },
         },
         {
@@ -240,6 +270,8 @@ export default function UsageTrend({
           yAxisIndex: 0,
           data: filteredData.map((d) => d.cache_read_tokens || 0),
           smooth: true,
+          showSymbol: timestamps.length <= 60,
+          symbolSize: timestamps.length <= 31 ? 6 : 4,
           itemStyle: { color: isDark ? '#c084fc' : '#9333ea' },
         },
         {
@@ -248,6 +280,8 @@ export default function UsageTrend({
           yAxisIndex: 1,
           data: filteredData.map((d) => d.cost || 0),
           smooth: true,
+          showSymbol: timestamps.length <= 60,
+          symbolSize: timestamps.length <= 31 ? 6 : 4,
           itemStyle: { color: isDark ? '#fbbf24' : '#d97706' },
           lineStyle: { type: 'dashed' },
         },
@@ -257,19 +291,23 @@ export default function UsageTrend({
 
   // Build chart options for model view
   const modelChartOption = useMemo(() => {
+    const isCostMetric = modelMetric === 'cost';
+    const valueFormatter = isCostMetric ? formatCostValue : formatNumber;
+
     // Get all unique timestamps
     const timestampSet = new Set<number>();
     modelTrendData.forEach((d) => timestampSet.add(d.timestamp));
     const allTimestamps = Array.from(timestampSet).sort((a, b) => a - b);
 
-    // Build data map: model -> timestamp -> total_tokens
+    // Build data map: model -> timestamp -> selected metric value
     const modelDataMap = new Map<string, Map<number, number>>();
     models.forEach((model) => {
       modelDataMap.set(model, new Map());
     });
     modelTrendData.forEach((d) => {
       if (d.model && modelDataMap.has(d.model)) {
-        modelDataMap.get(d.model)!.set(d.timestamp, d.total_tokens);
+        const value = (d[modelMetric as keyof ModelTrendData] as number) || 0;
+        modelDataMap.get(d.model)!.set(d.timestamp, value);
       }
     });
 
@@ -291,6 +329,8 @@ export default function UsageTrend({
         type: 'line',
         data: timestamps.map((ts) => dataMap.get(ts) || 0),
         smooth: true,
+        showSymbol: timestamps.length <= 60,
+        symbolSize: timestamps.length <= 31 ? 6 : 4,
         itemStyle: { color: MODEL_COLORS[index % MODEL_COLORS.length] },
       };
     });
@@ -317,7 +357,7 @@ export default function UsageTrend({
               html += `<div style="display:flex;align-items:center;gap:8px;color:${tooltipTextColor}">
                 <span style="display:inline-block;width:10px;height:10px;background:${p.color};border-radius:50%"></span>
                 <span>${p.seriesName}:</span>
-                <span style="font-weight:bold">${formatNumber(p.value)}</span>
+                <span style="font-weight:bold">${valueFormatter(p.value)}</span>
               </div>`;
             }
           });
@@ -342,12 +382,15 @@ export default function UsageTrend({
         axisLabel: {
           formatter: (value: number) => formatTime(value, effectiveInterval),
           color: textColor,
+          rotate: timestamps.length > 20 ? 45 : 0,
+          interval: timestamps.length <= 31 ? 0 : 'auto',
         },
+        axisTick: { alignWithLabel: true },
       },
       yAxis: {
         type: 'value',
         axisLabel: {
-          formatter: (value: number) => formatNumber(value),
+          formatter: (value: number) => valueFormatter(value),
           color: textColor,
         },
         splitLine: { lineStyle: { color: isDark ? '#252d3d' : '#e5e7eb' } },
@@ -368,7 +411,7 @@ export default function UsageTrend({
       ],
       series,
     };
-  }, [modelTrendData, models, effectiveInterval, t, showZeroValues, isDark]);
+  }, [modelTrendData, models, modelMetric, effectiveInterval, t, showZeroValues, isDark]);
 
   const chartOption = viewMode === 'total' ? totalChartOption : modelChartOption;
 
@@ -402,6 +445,24 @@ export default function UsageTrend({
                   {t('viewByModel')}
                 </Button>
               </div>
+              {viewMode === 'model' && (
+                <>
+                  <div className="h-5 w-px bg-border" />
+                  <div className="flex gap-1">
+                    {MODEL_METRIC_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        size="sm"
+                        variant={modelMetric === option.value ? 'default' : 'ghost'}
+                        onClick={() => setModelMetric(option.value)}
+                        className="h-7 px-2 text-xs"
+                      >
+                        {t(option.labelKey)}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
               <div className="h-5 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <Switch
@@ -443,6 +504,26 @@ export default function UsageTrend({
               </button>
             </div>
           </div>
+
+          {/* Mobile: metric selector for model view */}
+          {viewMode === 'model' && (
+            <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-6 px-6">
+              {MODEL_METRIC_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  className={cn(
+                    'shrink-0 text-xs font-medium py-1 px-2.5 rounded-md transition-all',
+                    modelMetric === option.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                  onClick={() => setModelMetric(option.value)}
+                >
+                  {t(option.labelKey)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Interval selector: scrollable on mobile, wrapping on desktop */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap scrollbar-hide -mx-6 px-6 sm:mx-0 sm:px-0">

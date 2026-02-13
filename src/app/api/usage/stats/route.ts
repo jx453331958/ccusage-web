@@ -4,7 +4,7 @@ import getDb from '@/lib/db';
 import { fetchPricing, calculateCostWithPricing } from '@/lib/pricing';
 
 // Supported intervals in minutes
-type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '1d';
+type Interval = '1m' | '5m' | '15m' | '30m' | '1h' | '2h' | '4h' | '6h' | '12h' | '1d';
 
 function getIntervalMinutes(interval: Interval): number {
   switch (interval) {
@@ -13,6 +13,10 @@ function getIntervalMinutes(interval: Interval): number {
     case '15m': return 15;
     case '30m': return 30;
     case '1h': return 60;
+    case '2h': return 120;
+    case '4h': return 240;
+    case '6h': return 360;
+    case '12h': return 720;
     case '1d': return 1440;
     default: return 60;
   }
@@ -191,10 +195,12 @@ export async function GET(request: NextRequest) {
   // Determine granularity based on interval or auto-select based on range
   let effectiveInterval: Interval;
   if (interval === 'auto') {
-    // Auto-select reasonable interval based on date span
-    if (rangeSpanDays <= 1) effectiveInterval = '1h';
-    else if (rangeSpanDays <= 7) effectiveInterval = '1d';
-    else effectiveInterval = '1d';
+    // Auto-select interval to produce ~20-50 data points
+    if (rangeSpanDays <= 1) effectiveInterval = '1h';       // ≤1d: hourly (≤24 pts)
+    else if (rangeSpanDays <= 3) effectiveInterval = '2h';   // 2-3d: 2-hour (24-36 pts)
+    else if (rangeSpanDays <= 7) effectiveInterval = '6h';   // 4-7d: 6-hour (16-28 pts)
+    else if (rangeSpanDays <= 14) effectiveInterval = '12h';  // 1-2w: 12-hour (14-28 pts)
+    else effectiveInterval = '1d';                            // >2w: daily
   } else {
     effectiveInterval = interval;
   }
