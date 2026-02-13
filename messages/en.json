@@ -158,6 +158,19 @@
       "passwordChanged": "Password changed successfully",
       "passwordChangeFailed": "Failed to change password",
       "errorOccurred": "An error occurred. Please try again."
+    },
+    "dangerZone": {
+      "title": "Danger Zone",
+      "description": "Irreversible operations, please proceed with caution",
+      "clearUsageData": "Clear Usage Data",
+      "clearUsageDescription": "Delete all usage records. Users, API keys, and settings will be preserved. Agents will need to run \"./setup.sh reset\" to re-report data.",
+      "clearConfirmTitle": "Are you sure?",
+      "clearConfirmDescription": "This will permanently delete all usage records ({count} records). This action cannot be undone.",
+      "confirmText": "I understand, clear all data",
+      "clearing": "Clearing...",
+      "clearSuccess": "Successfully cleared {count} usage records",
+      "clearFailed": "Failed to clear usage data",
+      "cancel": "Cancel"
     }
   }
 }
