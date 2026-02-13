@@ -70,6 +70,7 @@ chmod +x deploy.sh
 ./deploy.sh status   # 查看状态和最近日志
 ./deploy.sh logs     # 查看实时日志
 ./deploy.sh backup   # 备份数据库
+./deploy.sh reset-db # 备份并删除数据库，使用全新数据库重启
 ./deploy.sh clean    # 删除容器和镜像
 ```
 
@@ -195,6 +196,7 @@ chmod +x setup.sh
 ./setup.sh status     # 查看状态
 ./setup.sh update     # 更新到最新版本
 ./setup.sh restart    # 重启服务
+./setup.sh reset      # 清除本地状态，重新上报所有数据
 ./setup.sh config     # 编辑配置文件
 ./setup.sh run        # 测试运行一次
 ./setup.sh uninstall  # 卸载 agent

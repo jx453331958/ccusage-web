@@ -557,6 +557,63 @@ cmd_update() {
     fi
 }
 
+cmd_reset() {
+    log_warn "This will clear the local state file so the agent re-reports ALL usage data."
+    log_warn "State file: $HOME/.ccusage-agent-state.json"
+
+    # Check if running interactively
+    local can_prompt=false
+    if [[ -t 0 ]]; then
+        can_prompt=true
+    elif [[ -e /dev/tty ]]; then
+        if exec 3</dev/tty 2>/dev/null; then
+            exec 0<&3
+            can_prompt=true
+        fi
+    fi
+
+    if [[ "$can_prompt" == "true" ]]; then
+        printf "Are you sure? (y/N) "
+        read -r -n 1 REPLY
+        echo
+        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+            log_info "Reset cancelled"
+            return
+        fi
+    fi
+
+    if [[ -f "$HOME/.ccusage-agent-state.json" ]]; then
+        rm -f "$HOME/.ccusage-agent-state.json"
+        log_info "State file deleted. The agent will re-report all usage data on next run."
+    else
+        log_warn "State file not found. Nothing to reset."
+    fi
+
+    # Restart service if running
+    local os=$(detect_os)
+    local should_restart=false
+
+    case "$os" in
+        macos)
+            if launchctl list 2>/dev/null | grep -q "com.ccusage.agent"; then
+                should_restart=true
+            fi
+            ;;
+        linux)
+            if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+                should_restart=true
+            fi
+            ;;
+    esac
+
+    if [[ "$should_restart" == "true" ]]; then
+        log_info "Restarting service to trigger re-report..."
+        cmd_restart
+    else
+        log_info "Service not running. Data will be re-reported on next agent start."
+    fi
+}
+
 cmd_help() {
     echo "CCUsage Agent Setup Script"
     echo ""
@@ -567,8 +624,9 @@ cmd_help() {
     echo "  uninstall  Remove background service and configuration"
     echo "  status     Show current status"
     echo "  run        Run once (for testing)"
-    echo "  update     Update agent.js to latest version and restart"
+    echo "  update     Update agent to latest version and restart"
     echo "  restart    Restart the background service"
+    echo "  reset      Clear local state and re-report all usage data"
     echo "  config     Edit configuration file"
     echo "  help       Show this help message"
     echo ""
@@ -590,6 +648,9 @@ cmd_help() {
     echo ""
     echo "  # Update and restart"
     echo "  ./setup.sh update"
+    echo ""
+    echo "  # Re-report all usage data"
+    echo "  ./setup.sh reset"
     echo ""
     echo "  # Edit configuration"
     echo "  ./setup.sh config"
@@ -658,6 +719,7 @@ case "${1:-help}" in
     run)       cmd_run ;;
     update)    cmd_update ;;
     restart)   cmd_restart ;;
+    reset)     cmd_reset ;;
     config)    cmd_config ;;
     help|--help|-h) cmd_help ;;
     *)

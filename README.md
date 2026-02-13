@@ -70,6 +70,7 @@ The script will:
 ./deploy.sh status   # Show status and recent logs
 ./deploy.sh logs     # Follow container logs
 ./deploy.sh backup   # Backup the database
+./deploy.sh reset-db # Backup and delete database, restart with fresh db
 ./deploy.sh clean    # Remove containers and images
 ```
 
@@ -195,6 +196,7 @@ chmod +x setup.sh
 ./setup.sh status     # Check status
 ./setup.sh update     # Update to latest version
 ./setup.sh restart    # Restart the service
+./setup.sh reset      # Clear local state, re-report all data
 ./setup.sh config     # Edit configuration file
 ./setup.sh run        # Test run once
 ./setup.sh uninstall  # Remove agent

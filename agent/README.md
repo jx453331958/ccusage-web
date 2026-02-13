@@ -32,6 +32,7 @@ Other commands:
 ./setup.sh run        # Run once for testing
 ./setup.sh update     # Update agent to latest version and restart
 ./setup.sh restart    # Restart the background service
+./setup.sh reset      # Clear local state, re-report all usage data
 ./setup.sh config     # Edit configuration file
 ```
 
@@ -248,3 +249,8 @@ After editing the config file, restart the service to apply changes:
 ## State File
 
 The agent stores its state in `~/.ccusage-agent-state.json` to track which records have been reported. This file is automatically managed.
+
+To clear the state and re-report all usage data (e.g., after a server database reset):
+```bash
+./setup.sh reset
+```

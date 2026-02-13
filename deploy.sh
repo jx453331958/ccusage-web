@@ -158,6 +158,50 @@ backup() {
     fi
 }
 
+# Reset database (stop service, backup and remove db, restart)
+reset_db() {
+    print_warn "This will STOP the service, backup the current database, DELETE it, and restart."
+    print_warn "All usage data will be lost. Agents will need to re-report their data."
+    echo ""
+    read -p "Are you sure? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Reset cancelled"
+        return
+    fi
+
+    # Stop service first
+    print_info "Stopping service..."
+    docker compose down
+
+    # Backup existing database
+    if [ -f data/ccusage.db ]; then
+        BACKUP_FILE="backup_before_reset_$(date +%Y%m%d_%H%M%S).db"
+        cp data/ccusage.db "data/$BACKUP_FILE"
+        print_info "Database backed up to: data/$BACKUP_FILE"
+
+        # Remove database files
+        rm -f data/ccusage.db data/ccusage.db-wal data/ccusage.db-shm
+        print_info "Database deleted"
+    else
+        print_warn "No database file found"
+    fi
+
+    # Restart service (will auto-create a fresh database)
+    print_info "Starting service with fresh database..."
+    docker compose up -d
+
+    sleep 5
+
+    if docker compose ps | grep -q "Up"; then
+        print_info "Reset complete! Service is running with a fresh database."
+        print_warn "Remember to run './setup.sh reset' on each agent to re-report all data."
+    else
+        print_error "Service failed to start. Check logs with: docker compose logs"
+        exit 1
+    fi
+}
+
 # Clean up (remove containers and images)
 clean() {
     print_warn "This will remove containers and images. Data in ./data will be preserved."
@@ -186,12 +230,14 @@ show_help() {
     echo "  status   - Show service status and recent logs"
     echo "  logs     - Follow container logs"
     echo "  backup   - Backup the database"
+    echo "  reset-db - Backup and delete database, restart with fresh db"
     echo "  clean    - Remove containers and images"
     echo "  help     - Show this help message"
     echo ""
     echo "Examples:"
     echo "  $0 deploy    # First-time setup"
     echo "  $0 update    # Update to latest version"
+    echo "  $0 reset-db  # Clear all data and start fresh"
     echo "  $0 logs      # View logs"
 }
 
@@ -221,6 +267,9 @@ case "${1:-}" in
         ;;
     backup)
         backup
+        ;;
+    reset-db)
+        reset_db
         ;;
     clean)
         clean
