@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Key, Trash2, Copy, Check, Terminal } from 'lucide-react';
+import { Key, Trash2, Copy, Check, Terminal, Download, RefreshCw, Activity, XCircle } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 function getServerUrl() {
@@ -31,7 +31,6 @@ export default function ApiKeyManager() {
   const [deviceName, setDeviceName] = useState('');
   const [newKey, setNewKey] = useState<ApiKey | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [copiedCommand, setCopiedCommand] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [installDialogKey, setInstallDialogKey] = useState<ApiKey | null>(null);
@@ -91,15 +90,60 @@ export default function ApiKeyManager() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const copyInstallCommand = (command: string) => {
+  const [copiedCommandId, setCopiedCommandId] = useState<string | null>(null);
+
+  const copyCommand = (command: string, id: string) => {
     navigator.clipboard.writeText(command);
-    setCopiedCommand(true);
-    setTimeout(() => setCopiedCommand(false), 2000);
+    setCopiedCommandId(id);
+    setTimeout(() => setCopiedCommandId(null), 2000);
+  };
+
+  const SETUP_URL = 'https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh';
+
+  const getCommands = (apiKey: string) => {
+    const serverUrl = getServerUrl();
+    return [
+      {
+        id: 'install',
+        labelKey: 'cmdInstall' as const,
+        descKey: 'cmdInstallDesc' as const,
+        icon: Download,
+        command: `curl -sL ${SETUP_URL} | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`,
+      },
+      {
+        id: 'update',
+        labelKey: 'cmdUpdate' as const,
+        descKey: 'cmdUpdateDesc' as const,
+        icon: RefreshCw,
+        command: `curl -sL ${SETUP_URL} | bash -s update`,
+      },
+      {
+        id: 'reset',
+        labelKey: 'cmdReset' as const,
+        descKey: 'cmdResetDesc' as const,
+        icon: Activity,
+        command: `curl -sL ${SETUP_URL} | bash -s reset`,
+      },
+      {
+        id: 'status',
+        labelKey: 'cmdStatus' as const,
+        descKey: 'cmdStatusDesc' as const,
+        icon: Terminal,
+        command: `curl -sL ${SETUP_URL} | bash -s status`,
+      },
+      {
+        id: 'uninstall',
+        labelKey: 'cmdUninstall' as const,
+        descKey: 'cmdUninstallDesc' as const,
+        icon: XCircle,
+        command: `curl -sL ${SETUP_URL} | bash -s uninstall`,
+      },
+    ];
   };
 
   const getInstallCommand = (apiKey: string) => {
     const serverUrl = getServerUrl();
-    return `curl -sL https://raw.githubusercontent.com/jx453331958/ccusage-web/main/agent/setup.sh | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`;
+    return `curl -sL ${SETUP_URL} | CCUSAGE_SERVER=${serverUrl} CCUSAGE_API_KEY=${apiKey} bash -s install`;
   };
 
   return (
@@ -168,9 +212,9 @@ export default function ApiKeyManager() {
                         size="sm"
                         variant="secondary"
                         className="absolute top-2 right-2"
-                        onClick={() => copyInstallCommand(getInstallCommand(newKey.key))}
+                        onClick={() => copyCommand(getInstallCommand(newKey.key), 'new-install')}
                       >
-                        {copiedCommand ? (
+                        {copiedCommandId === 'new-install' ? (
                           <>
                             <Check className="h-3 w-3 mr-1" />
                             {t('copied')}
@@ -188,7 +232,7 @@ export default function ApiKeyManager() {
                     className="w-full"
                     onClick={() => {
                       setNewKey(null);
-                      setCopiedCommand(false);
+                      setCopiedCommandId(null);
                       setDialogOpen(false);
                     }}
                   >
@@ -287,43 +331,58 @@ export default function ApiKeyManager() {
         </div>
       </CardContent>
 
-      {/* Install Command Dialog */}
-      <Dialog open={!!installDialogKey} onOpenChange={(open) => !open && setInstallDialogKey(null)}>
-        <DialogContent>
+      {/* Quick Commands Dialog */}
+      <Dialog open={!!installDialogKey} onOpenChange={(open) => { if (!open) { setInstallDialogKey(null); setCopiedCommandId(null); } }}>
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{t('installTitle')}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Terminal className="h-5 w-5" />
+              {t('installTitle')}
+            </DialogTitle>
             <DialogDescription>
-              {installDialogKey?.device_name}
+              {installDialogKey?.device_name} — {t('installDescription')}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {t('installDescription')}
-            </p>
-            <div className="relative">
-              <pre className="p-3 bg-gray-900 dark:bg-[#141926] text-gray-100 dark:text-gray-300 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
-                {installDialogKey && getInstallCommand(installDialogKey.key)}
-              </pre>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="absolute top-2 right-2"
-                onClick={() => installDialogKey && copyInstallCommand(getInstallCommand(installDialogKey.key))}
-              >
-                {copiedCommand ? (
-                  <>
-                    <Check className="h-3 w-3 mr-1" />
-                    {t('copied')}
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3 w-3 mr-1" />
-                    {t('copyCommand')}
-                  </>
-                )}
-              </Button>
+          {installDialogKey && (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {getCommands(installDialogKey.key).map((cmd) => {
+                const Icon = cmd.icon;
+                const isCopied = copiedCommandId === cmd.id;
+                return (
+                  <div key={cmd.id} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm font-medium">{t(cmd.labelKey)}</span>
+                        <span className="text-xs text-muted-foreground hidden sm:inline">— {t(cmd.descKey)}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={isCopied ? 'default' : 'outline'}
+                        className="flex-shrink-0 h-7 px-2 text-xs"
+                        onClick={() => copyCommand(cmd.command, cmd.id)}
+                      >
+                        {isCopied ? (
+                          <>
+                            <Check className="h-3 w-3 mr-1" />
+                            {t('copied')}
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3 mr-1" />
+                            {t('copyCommand')}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <pre className="p-2 bg-gray-900 dark:bg-[#141926] text-gray-100 dark:text-gray-300 rounded text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                      {cmd.command}
+                    </pre>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </Card>
