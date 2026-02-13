@@ -329,9 +329,9 @@ function parseJsonlFile(filePath) {
           _msgId: msgId,
         };
 
-        // Keep the entry with the largest output_tokens per message ID
-        const existing = msgMap.get(msgId);
-        if (!existing || outputTokens >= existing.output_tokens) {
+        // Keep the FIRST entry per message ID (it has the correct final usage)
+        // Later entries are streaming chunks with cumulative intermediate values
+        if (!msgMap.has(msgId)) {
           msgMap.set(msgId, recordData);
         }
       } catch (err) {

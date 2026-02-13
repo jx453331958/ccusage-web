@@ -261,8 +261,9 @@ def parse_jsonl_file(file_path: Path, state: State) -> List[Dict]:
                         '_msg_id': msg_id,
                     }
 
-                    # Keep the entry with the largest output_tokens per message ID
-                    if msg_id not in msg_map or output_tokens >= msg_map[msg_id]['output_tokens']:
+                    # Keep the FIRST entry per message ID (it has the correct final usage)
+                    # Later entries are streaming chunks with cumulative intermediate values
+                    if msg_id not in msg_map:
                         msg_map[msg_id] = record_data
 
                 except json.JSONDecodeError:
