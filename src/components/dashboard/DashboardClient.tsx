@@ -263,77 +263,81 @@ export default function DashboardClient({ user }: { user: User }) {
         {/* Shared Filters Row - visible on Overview and Devices tabs */}
         {activeTab !== 'api-keys' && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 sm:flex-wrap mb-6">
-            {/* Device Selector */}
-            <div className="relative" ref={deviceDropdownRef}>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
-                className="w-full sm:w-auto sm:min-w-[160px] justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  <span className="truncate max-w-[120px]">
-                    {selectedDevices.length === 0
-                      ? t('dashboard.devices.allDevices')
-                      : selectedDevices.length === 1
-                        ? selectedDevices[0]
-                        : t('dashboard.devices.devicesCount', { count: selectedDevices.length })}
-                  </span>
-                </span>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
-              </Button>
-              {deviceDropdownOpen && stats?.availableDevices && (
-                <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-background border rounded-md shadow-lg py-1">
-                  <button
-                    onClick={() => setSelectedDevices([])}
-                    className={cn(
-                      "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
-                      selectedDevices.length === 0 && "bg-accent/50 font-medium"
-                    )}
+            {/* Device Selector - only on Overview tab */}
+            {activeTab === 'overview' && (
+              <>
+                <div className="relative" ref={deviceDropdownRef}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
+                    className="w-full sm:w-auto sm:min-w-[160px] justify-between"
                   >
-                    <div className={cn(
-                      "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
-                      selectedDevices.length === 0 ? "bg-primary border-primary" : "border-input"
-                    )}>
-                      {selectedDevices.length === 0 && <Check className="h-3 w-3 text-primary-foreground" />}
-                    </div>
-                    <Monitor className="h-4 w-4" />
-                    {t('dashboard.devices.allDevices')}
-                  </button>
-                  {stats.availableDevices.map((device: string) => {
-                    const isSelected = selectedDevices.includes(device);
-                    return (
+                    <span className="flex items-center gap-2">
+                      <Monitor className="h-4 w-4" />
+                      <span className="truncate max-w-[120px]">
+                        {selectedDevices.length === 0
+                          ? t('dashboard.devices.allDevices')
+                          : selectedDevices.length === 1
+                            ? selectedDevices[0]
+                            : t('dashboard.devices.devicesCount', { count: selectedDevices.length })}
+                      </span>
+                    </span>
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
+                  </Button>
+                  {deviceDropdownOpen && stats?.availableDevices && (
+                    <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-background border rounded-md shadow-lg py-1">
                       <button
-                        key={device}
-                        onClick={() => {
-                          setSelectedDevices(prev =>
-                            prev.includes(device)
-                              ? prev.filter(d => d !== device)
-                              : [...prev, device]
-                          );
-                        }}
+                        onClick={() => setSelectedDevices([])}
                         className={cn(
                           "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
-                          isSelected && "bg-accent/50 font-medium"
+                          selectedDevices.length === 0 && "bg-accent/50 font-medium"
                         )}
                       >
                         <div className={cn(
                           "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
-                          isSelected ? "bg-primary border-primary" : "border-input"
+                          selectedDevices.length === 0 ? "bg-primary border-primary" : "border-input"
                         )}>
-                          {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                          {selectedDevices.length === 0 && <Check className="h-3 w-3 text-primary-foreground" />}
                         </div>
-                        <span className="truncate">{device}</span>
+                        <Monitor className="h-4 w-4" />
+                        {t('dashboard.devices.allDevices')}
                       </button>
-                    );
-                  })}
+                      {stats.availableDevices.map((device: string) => {
+                        const isSelected = selectedDevices.includes(device);
+                        return (
+                          <button
+                            key={device}
+                            onClick={() => {
+                              setSelectedDevices(prev =>
+                                prev.includes(device)
+                                  ? prev.filter(d => d !== device)
+                                  : [...prev, device]
+                              );
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
+                              isSelected && "bg-accent/50 font-medium"
+                            )}
+                          >
+                            <div className={cn(
+                              "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
+                              isSelected ? "bg-primary border-primary" : "border-input"
+                            )}>
+                              {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                            </div>
+                            <span className="truncate">{device}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Divider - desktop only */}
-            <div className="h-6 w-px bg-border hidden sm:block" />
+                {/* Divider - desktop only */}
+                <div className="h-6 w-px bg-border hidden sm:block" />
+              </>
+            )}
 
             {/* Date Range Picker - Desktop */}
             <div className="hidden sm:block sm:w-auto">
