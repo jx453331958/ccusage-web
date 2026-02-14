@@ -260,96 +260,149 @@ export default function DashboardClient({ user }: { user: User }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* Filters Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 sm:flex-wrap">
-              {/* Device Selector */}
-              <div className="relative" ref={deviceDropdownRef}>
+        {/* Shared Filters Row - visible on Overview and Devices tabs */}
+        {activeTab !== 'api-keys' && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 sm:flex-wrap mb-6">
+            {/* Device Selector */}
+            <div className="relative" ref={deviceDropdownRef}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
+                className="w-full sm:w-auto sm:min-w-[160px] justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <Monitor className="h-4 w-4" />
+                  <span className="truncate max-w-[120px]">
+                    {selectedDevices.length === 0
+                      ? t('dashboard.devices.allDevices')
+                      : selectedDevices.length === 1
+                        ? selectedDevices[0]
+                        : t('dashboard.devices.devicesCount', { count: selectedDevices.length })}
+                  </span>
+                </span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
+              </Button>
+              {deviceDropdownOpen && stats?.availableDevices && (
+                <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-background border rounded-md shadow-lg py-1">
+                  <button
+                    onClick={() => setSelectedDevices([])}
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
+                      selectedDevices.length === 0 && "bg-accent/50 font-medium"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
+                      selectedDevices.length === 0 ? "bg-primary border-primary" : "border-input"
+                    )}>
+                      {selectedDevices.length === 0 && <Check className="h-3 w-3 text-primary-foreground" />}
+                    </div>
+                    <Monitor className="h-4 w-4" />
+                    {t('dashboard.devices.allDevices')}
+                  </button>
+                  {stats.availableDevices.map((device: string) => {
+                    const isSelected = selectedDevices.includes(device);
+                    return (
+                      <button
+                        key={device}
+                        onClick={() => {
+                          setSelectedDevices(prev =>
+                            prev.includes(device)
+                              ? prev.filter(d => d !== device)
+                              : [...prev, device]
+                          );
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
+                          isSelected && "bg-accent/50 font-medium"
+                        )}
+                      >
+                        <div className={cn(
+                          "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
+                          isSelected ? "bg-primary border-primary" : "border-input"
+                        )}>
+                          {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                        </div>
+                        <span className="truncate">{device}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Divider - desktop only */}
+            <div className="h-6 w-px bg-border hidden sm:block" />
+
+            {/* Date Range Picker - Desktop */}
+            <div className="hidden sm:block sm:w-auto">
+              <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined} theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+                <DatePicker.RangePicker
+                  presets={rangePresets}
+                  value={dateRange}
+                  onChange={(dates) => {
+                    if (dates && dates[0] && dates[1]) {
+                      const from = dates[0].startOf('day');
+                      const to = dates[1].startOf('day');
+                      setDateRange([from, to]);
+                      setActivePresetKey(findMatchingPresetKey(from, to));
+                      setShowCustomPicker(false);
+                    }
+                  }}
+                  disabledDate={(current) => current.isAfter(dayjs(), 'day')}
+                  allowClear={false}
+                  style={{ width: '100%' }}
+                />
+              </ConfigProvider>
+            </div>
+
+            {/* Date Preset Chips - Mobile */}
+            <div className="sm:hidden w-full space-y-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4">
+                {datePresets.map((preset) => (
+                  <Button
+                    key={preset.key}
+                    size="sm"
+                    variant={activePresetKey === preset.key ? 'default' : 'outline'}
+                    onClick={() => {
+                      setDateRange([preset.from, preset.to]);
+                      setActivePresetKey(preset.key);
+                      setShowCustomPicker(false);
+                    }}
+                    className="shrink-0 h-7 px-2.5 text-xs"
+                  >
+                    {preset.key === 'today'
+                      ? t('dashboard.timeRange.today')
+                      : t(`dashboard.timeRange.presets.${preset.key}`)}
+                  </Button>
+                ))}
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => setDeviceDropdownOpen(!deviceDropdownOpen)}
-                  className="w-full sm:w-auto sm:min-w-[160px] justify-between"
+                  variant={activePresetKey === null ? 'default' : 'outline'}
+                  onClick={() => {
+                    setActivePresetKey(null);
+                    setShowCustomPicker(true);
+                  }}
+                  className="shrink-0 h-7 px-2.5 text-xs"
                 >
-                  <span className="flex items-center gap-2">
-                    <Monitor className="h-4 w-4" />
-                    <span className="truncate max-w-[120px]">
-                      {selectedDevices.length === 0
-                        ? t('dashboard.devices.allDevices')
-                        : selectedDevices.length === 1
-                          ? selectedDevices[0]
-                          : t('dashboard.devices.devicesCount', { count: selectedDevices.length })}
-                    </span>
-                  </span>
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", deviceDropdownOpen && "rotate-180")} />
+                  {t('dashboard.timeRange.custom')}
                 </Button>
-                {deviceDropdownOpen && stats?.availableDevices && (
-                  <div className="absolute z-50 mt-1 w-full min-w-[200px] bg-background border rounded-md shadow-lg py-1">
-                    <button
-                      onClick={() => setSelectedDevices([])}
-                      className={cn(
-                        "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
-                        selectedDevices.length === 0 && "bg-accent/50 font-medium"
-                      )}
-                    >
-                      <div className={cn(
-                        "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
-                        selectedDevices.length === 0 ? "bg-primary border-primary" : "border-input"
-                      )}>
-                        {selectedDevices.length === 0 && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </div>
-                      <Monitor className="h-4 w-4" />
-                      {t('dashboard.devices.allDevices')}
-                    </button>
-                    {stats.availableDevices.map((device: string) => {
-                      const isSelected = selectedDevices.includes(device);
-                      return (
-                        <button
-                          key={device}
-                          onClick={() => {
-                            setSelectedDevices(prev =>
-                              prev.includes(device)
-                                ? prev.filter(d => d !== device)
-                                : [...prev, device]
-                            );
-                          }}
-                          className={cn(
-                            "w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center gap-2",
-                            isSelected && "bg-accent/50 font-medium"
-                          )}
-                        >
-                          <div className={cn(
-                            "h-4 w-4 rounded border flex items-center justify-center flex-shrink-0",
-                            isSelected ? "bg-primary border-primary" : "border-input"
-                          )}>
-                            {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
-                          </div>
-                          <span className="truncate">{device}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
-
-              {/* Divider - desktop only */}
-              <div className="h-6 w-px bg-border hidden sm:block" />
-
-              {/* Date Range Picker - Desktop */}
-              <div className="hidden sm:block sm:w-auto">
+              {showCustomPicker && (
                 <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined} theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
                   <DatePicker.RangePicker
-                    presets={rangePresets}
                     value={dateRange}
                     onChange={(dates) => {
                       if (dates && dates[0] && dates[1]) {
                         const from = dates[0].startOf('day');
                         const to = dates[1].startOf('day');
                         setDateRange([from, to]);
-                        setActivePresetKey(findMatchingPresetKey(from, to));
-                        setShowCustomPicker(false);
+                        const matched = findMatchingPresetKey(from, to);
+                        if (matched) {
+                          setActivePresetKey(matched);
+                          setShowCustomPicker(false);
+                        }
                       }
                     }}
                     disabledDate={(current) => current.isAfter(dayjs(), 'day')}
@@ -357,65 +410,14 @@ export default function DashboardClient({ user }: { user: User }) {
                     style={{ width: '100%' }}
                   />
                 </ConfigProvider>
-              </div>
-
-              {/* Date Preset Chips - Mobile */}
-              <div className="sm:hidden w-full space-y-2">
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4">
-                  {datePresets.map((preset) => (
-                    <Button
-                      key={preset.key}
-                      size="sm"
-                      variant={activePresetKey === preset.key ? 'default' : 'outline'}
-                      onClick={() => {
-                        setDateRange([preset.from, preset.to]);
-                        setActivePresetKey(preset.key);
-                        setShowCustomPicker(false);
-                      }}
-                      className="shrink-0 h-7 px-2.5 text-xs"
-                    >
-                      {preset.key === 'today'
-                        ? t('dashboard.timeRange.today')
-                        : t(`dashboard.timeRange.presets.${preset.key}`)}
-                    </Button>
-                  ))}
-                  <Button
-                    size="sm"
-                    variant={activePresetKey === null ? 'default' : 'outline'}
-                    onClick={() => {
-                      setActivePresetKey(null);
-                      setShowCustomPicker(true);
-                    }}
-                    className="shrink-0 h-7 px-2.5 text-xs"
-                  >
-                    {t('dashboard.timeRange.custom')}
-                  </Button>
-                </div>
-                {showCustomPicker && (
-                  <ConfigProvider locale={locale === 'zh' ? antdZhCN : undefined} theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
-                    <DatePicker.RangePicker
-                      value={dateRange}
-                      onChange={(dates) => {
-                        if (dates && dates[0] && dates[1]) {
-                          const from = dates[0].startOf('day');
-                          const to = dates[1].startOf('day');
-                          setDateRange([from, to]);
-                          const matched = findMatchingPresetKey(from, to);
-                          if (matched) {
-                            setActivePresetKey(matched);
-                            setShowCustomPicker(false);
-                          }
-                        }
-                      }}
-                      disabledDate={(current) => current.isAfter(dayjs(), 'day')}
-                      allowClear={false}
-                      style={{ width: '100%' }}
-                    />
-                  </ConfigProvider>
-                )}
-              </div>
+              )}
             </div>
+          </div>
+        )}
 
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
             {loading ? (
               <div className="text-center py-12">
                 <div className="flex items-center justify-center gap-2 text-muted-foreground">
