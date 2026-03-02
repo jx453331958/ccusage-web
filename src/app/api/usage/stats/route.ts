@@ -370,9 +370,9 @@ export async function GET(request: NextRequest) {
     totalStats: {
       totalInput: totalStats.total_input || 0,
       totalOutput: totalStats.total_output || 0,
-      totalTokens: totalStats.total_tokens || 0,
       totalCacheCreate: totalStats.total_cache_create || 0,
       totalCacheRead: totalStats.total_cache_read || 0,
+      totalTokens: totalStats.total_tokens || 0,
       totalRecords: totalStats.total_records || 0,
       totalCost,
     },

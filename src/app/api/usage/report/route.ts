@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
 
         const inputTokens = Number(record.input_tokens) || 0;
         const outputTokens = Number(record.output_tokens) || 0;
-        const totalTokens = Number(record.total_tokens) || 0;
         const cacheCreate = Number(record.cache_create_tokens) || 0;
         const cacheRead = Number(record.cache_read_tokens) || 0;
+        const totalTokens = inputTokens + outputTokens + cacheCreate + cacheRead;
         const model = String(record.model || 'unknown');
         const sessionId = record.session_id != null ? String(record.session_id) : null;
 

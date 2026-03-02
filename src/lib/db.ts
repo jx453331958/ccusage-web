@@ -62,6 +62,8 @@ function initializeDatabase() {
       device_name TEXT NOT NULL,
       input_tokens INTEGER NOT NULL DEFAULT 0,
       output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_create_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
       total_tokens INTEGER NOT NULL DEFAULT 0,
       session_id TEXT,
       timestamp INTEGER NOT NULL,
@@ -152,9 +154,9 @@ export interface UsageRecord {
   device_name: string;
   input_tokens: number;
   output_tokens: number;
-  total_tokens: number;
   cache_create_tokens: number;
   cache_read_tokens: number;
+  total_tokens: number;
   session_id: string | null;
   model: string;
   timestamp: number;

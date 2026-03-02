@@ -262,7 +262,9 @@ Content-Type: application/json
     {
       "input_tokens": 1000,
       "output_tokens": 500,
-      "total_tokens": 1500,
+      "cache_write_tokens": 200,
+      "cache_read_tokens": 800,
+      "total_tokens": 2500,
       "session_id": "可选的会话ID",
       "timestamp": 1234567890
     }

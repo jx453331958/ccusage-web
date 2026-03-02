@@ -32,9 +32,9 @@ interface StatsOverviewProps {
   stats: {
     totalInput: number;
     totalOutput: number;
-    totalTokens: number;
     totalCacheCreate: number;
     totalCacheRead: number;
+    totalTokens: number;
     totalRecords: number;
     totalCost: number;
   };

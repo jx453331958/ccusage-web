@@ -50,7 +50,7 @@
       "inputTokens": "Input Tokens",
       "outputTokens": "Output Tokens",
       "totalRecords": "Total Records",
-      "combinedInputOutput": "Combined input + output",
+      "combinedInputOutput": "Input + output + cache",
       "sentToClaude": "Sent to Claude",
       "receivedFromClaude": "Received from Claude",
       "usageReports": "Usage reports",

@@ -330,7 +330,7 @@ function collectRecords(files) {
           records.push({
             input_tokens: inputTokens,
             output_tokens: outputTokens,
-            total_tokens: inputTokens + outputTokens,
+            total_tokens: inputTokens + outputTokens + cacheCreate + cacheRead,
             cache_create_tokens: cacheCreate,
             cache_read_tokens: cacheRead,
             session_id: entry.sessionId || entry.session_id || null,

@@ -272,7 +272,7 @@ def collect_records(files: List[Path], state: 'State') -> List[Dict]:
                         records.append({
                             'input_tokens': input_tokens,
                             'output_tokens': output_tokens,
-                            'total_tokens': input_tokens + output_tokens,
+                            'total_tokens': input_tokens + output_tokens + cache_create + cache_read,
                             'cache_create_tokens': cache_create,
                             'cache_read_tokens': cache_read,
                             'session_id': entry.get('sessionId') or entry.get('session_id'),

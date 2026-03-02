@@ -50,7 +50,7 @@
       "inputTokens": "输入 Token",
       "outputTokens": "输出 Token",
       "totalRecords": "总记录数",
-      "combinedInputOutput": "输入和输出的总和",
+      "combinedInputOutput": "输入 + 输出 + 缓存",
       "sentToClaude": "发送给 Claude",
       "receivedFromClaude": "从 Claude 接收",
       "usageReports": "使用报告",
