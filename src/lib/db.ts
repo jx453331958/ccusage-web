@@ -87,6 +87,16 @@ function initializeDatabase() {
     database.exec(`ALTER TABLE usage_records ADD COLUMN cache_read_tokens INTEGER DEFAULT 0`);
   }
 
+  // Migration: Recalculate total_tokens to include cache tokens
+  const needsRecalc = database.prepare(
+    `SELECT 1 FROM usage_records WHERE total_tokens != (input_tokens + output_tokens + cache_create_tokens + cache_read_tokens) LIMIT 1`
+  ).get();
+  if (needsRecalc) {
+    database.exec(
+      `UPDATE usage_records SET total_tokens = input_tokens + output_tokens + cache_create_tokens + cache_read_tokens WHERE total_tokens != (input_tokens + output_tokens + cache_create_tokens + cache_read_tokens)`
+    );
+  }
+
   // Settings table (for auto-generated secrets, etc.)
   database.exec(`
     CREATE TABLE IF NOT EXISTS settings (
