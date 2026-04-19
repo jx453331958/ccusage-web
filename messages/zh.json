@@ -146,7 +146,9 @@
       "cacheWrite": "缓存写入",
       "cacheRead": "缓存读取",
       "allDevices": "所有设备",
-      "devicesCount": "{count} 台设备"
+      "devicesCount": "{count} 台设备",
+      "searchPlaceholder": "搜索设备...",
+      "noMatch": "没有匹配的设备"
     }
   },
   "settings": {

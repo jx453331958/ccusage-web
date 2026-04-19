@@ -146,7 +146,9 @@
       "cacheWrite": "cache write",
       "cacheRead": "cache read",
       "allDevices": "All Devices",
-      "devicesCount": "{count} Devices"
+      "devicesCount": "{count} Devices",
+      "searchPlaceholder": "Search devices...",
+      "noMatch": "No matching devices"
     }
   },
   "settings": {
