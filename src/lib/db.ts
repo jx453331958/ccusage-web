@@ -97,6 +97,51 @@ function initializeDatabase() {
     );
   }
 
+  // Migration: relax api_key_id FK to ON DELETE SET NULL so deleting an api_key
+  // preserves historical usage_records (records still carry device_name).
+  const usageTableSql = (database
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='usage_records'`)
+    .get() as { sql: string } | undefined)?.sql ?? '';
+  if (!usageTableSql.includes('ON DELETE SET NULL')) {
+    database.pragma('foreign_keys = OFF');
+    try {
+      const migrate = database.transaction(() => {
+        database.exec(`
+          CREATE TABLE usage_records_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            api_key_id INTEGER,
+            device_name TEXT NOT NULL,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            cache_create_tokens INTEGER NOT NULL DEFAULT 0,
+            cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            session_id TEXT,
+            model TEXT DEFAULT 'unknown',
+            timestamp INTEGER NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL
+          )
+        `);
+        database.exec(`
+          INSERT INTO usage_records_new
+            (id, api_key_id, device_name, input_tokens, output_tokens,
+             cache_create_tokens, cache_read_tokens, total_tokens,
+             session_id, model, timestamp, created_at)
+          SELECT id, api_key_id, device_name, input_tokens, output_tokens,
+             cache_create_tokens, cache_read_tokens, total_tokens,
+             session_id, model, timestamp, created_at
+          FROM usage_records
+        `);
+        database.exec(`DROP TABLE usage_records`);
+        database.exec(`ALTER TABLE usage_records_new RENAME TO usage_records`);
+      });
+      migrate();
+    } finally {
+      database.pragma('foreign_keys = ON');
+    }
+  }
+
   // Settings table (for auto-generated secrets, etc.)
   database.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -160,7 +205,7 @@ export interface ApiKey {
 
 export interface UsageRecord {
   id: number;
-  api_key_id: number;
+  api_key_id: number | null;
   device_name: string;
   input_tokens: number;
   output_tokens: number;
