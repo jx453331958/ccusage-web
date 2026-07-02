@@ -7,7 +7,7 @@
 ## 功能特性
 
 - 🌍 **完整的国际化支持** - 完整的中英文本地化
-- 📊 **实时 token 用量监控** - 跨设备追踪 Claude Code 使用情况
+- 📊 **实时 token 用量监控** - 跨设备追踪 Claude Code 和 Codex CLI 使用情况
 - 🖥️ **多设备支持** - 基于 Agent 的多机器数据上报
 - 🔐 **安全认证** - 基于 JWT 的管理员系统，支持密码管理
 - 📈 **交互式仪表板** - 精美的图表展示用量统计和趋势
@@ -203,7 +203,7 @@ chmod +x setup.sh
 
 ### 配置文件
 
-Agent 的配置存储在 `~/.ccusage-agent.conf`：
+Agent 的配置存储在 `~/.ccusage-agent.conf`。除 Claude Code 相关设置外，还支持 `CODEX_HOME` 和 `CODEX_DISABLED` 用于配置 Codex CLI 用量采集（详见 [agent/README.md](agent/README.md)）：
 
 ```bash
 # 编辑配置

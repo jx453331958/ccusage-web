@@ -1,6 +1,6 @@
 # CCUsage Agent
 
-A lightweight monitoring agent that collects Claude Code usage data and reports it to the CCUsage Web server.
+A lightweight monitoring agent that collects Claude Code and OpenAI Codex CLI usage data and reports it to the CCUsage Web server.
 
 **Supports both Python 3 and Node.js** - The setup script automatically detects and uses Python 3 (preferred) or Node.js.
 
@@ -77,6 +77,8 @@ node agent.js --server http://your-server:3000 --api-key YOUR_API_KEY --once
 export CCUSAGE_SERVER=http://your-server:3000
 export CCUSAGE_API_KEY=your_api_key_here
 export CLAUDE_PROJECTS_DIR=~/.claude/projects  # Optional
+export CODEX_HOME=~/.codex  # Optional, Codex CLI home directory
+export CODEX_DISABLED=false  # Optional, set true to skip Codex CLI collection
 export REPORT_INTERVAL=1  # Minutes (1-1440), optional (default: 5)
 
 node agent.js
@@ -193,10 +195,10 @@ nssm start CCUsageAgent
 
 ## How It Works
 
-1. The agent scans `~/.claude/projects/` for JSONL log files
-2. Parses usage records (input/output tokens) from the logs
+1. The agent scans `~/.claude/projects/` for Claude Code JSONL log files, and `~/.codex/sessions/` (and `archived_sessions/`) for Codex CLI JSONL log files
+2. Parses usage records (input/output/cache tokens) from both sources; Codex CLI records are tagged with a `codex/` model prefix (e.g. `codex/gpt-5.5`) so they're distinguishable from Claude Code usage on the dashboard
 3. Reports new records to the server via API
-4. Maintains state to avoid duplicate reports
+4. Maintains separate dedup state per source (`~/.ccusage-agent-state.json` for Claude Code, `~/.ccusage-agent-codex-state.json` for Codex CLI) to avoid duplicate reports
 5. Repeats at the configured interval (1-1440 minutes, default: 5)
 
 ## Report Interval
@@ -237,6 +239,12 @@ REPORT_INTERVAL="5"
 
 # Claude projects directory (optional, default: ~/.claude/projects)
 # CLAUDE_PROJECTS_DIR=""
+
+# Codex CLI home directory (optional, default: ~/.codex)
+# CODEX_HOME=""
+
+# Disable Codex CLI usage collection (true/false, default: false)
+# CODEX_DISABLED="false"
 ```
 
 Configuration priority: command line args > environment variables > config file > defaults
@@ -248,7 +256,7 @@ After editing the config file, restart the service to apply changes:
 
 ## State File
 
-The agent stores its state in `~/.ccusage-agent-state.json` to track which records have been reported. This file is automatically managed.
+The agent stores its state in `~/.ccusage-agent-state.json` (Claude Code) and `~/.ccusage-agent-codex-state.json` (Codex CLI) to track which records have been reported. Both files are automatically managed.
 
 To clear the state and re-report all usage data (e.g., after a server database reset):
 ```bash

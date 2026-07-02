@@ -7,7 +7,7 @@ A web-based monitoring dashboard for Claude Code token usage across multiple dev
 ## Features
 
 - 🌍 **Full i18n support** - Complete English and Chinese localization
-- 📊 **Real-time token usage monitoring** - Track Claude Code usage across all devices
+- 📊 **Real-time token usage monitoring** - Track Claude Code and Codex CLI usage across all devices
 - 🖥️ **Multi-device support** - Agent-based reporting from multiple machines
 - 🔐 **Secure authentication** - JWT-based admin system with password management
 - 📈 **Interactive dashboard** - Beautiful charts with usage statistics and trends
@@ -203,7 +203,7 @@ chmod +x setup.sh
 
 ### Configuration File
 
-The agent stores configuration in `~/.ccusage-agent.conf`:
+The agent stores configuration in `~/.ccusage-agent.conf`. In addition to the Claude Code settings, it also supports `CODEX_HOME` and `CODEX_DISABLED` for OpenAI Codex CLI usage collection (see [agent/README.md](agent/README.md)):
 
 ```bash
 # Edit configuration
