@@ -2,8 +2,8 @@
 """
 CCUsage Agent (Python)
 
-A lightweight monitoring agent that collects Claude Code usage data
-and reports it to the CCUsage Web server.
+A lightweight monitoring agent that collects Claude Code and OpenAI Codex CLI
+usage data and reports it to the CCUsage Web server.
 
 Usage:
     python3 agent.py --server http://localhost:3000 --api-key YOUR_API_KEY
@@ -12,6 +12,8 @@ Configuration via environment variables:
     CCUSAGE_SERVER - Server URL (default: http://localhost:3000)
     CCUSAGE_API_KEY - API key for authentication
     CLAUDE_PROJECTS_DIR - Claude projects directory (default: ~/.claude/projects)
+    CODEX_HOME - Codex CLI home directory (default: ~/.codex)
+    CODEX_DISABLED - Disable Codex CLI usage collection (true/false, default: false)
     REPORT_INTERVAL - Report interval in minutes (default: 5)
 
 Requirements: Python 3.6+ (uses only standard library)
@@ -30,7 +32,7 @@ from urllib.error import URLError, HTTPError
 from typing import Dict, List, Set, Optional, Any
 
 # Version
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 
 # User agent string
 USER_AGENT = f'CCUsage-Agent/{VERSION} (Python)'
@@ -38,6 +40,7 @@ USER_AGENT = f'CCUsage-Agent/{VERSION} (Python)'
 # Configuration file path
 CONFIG_FILE = Path.home() / '.ccusage-agent.conf'
 STATE_FILE = Path.home() / '.ccusage-agent-state.json'
+CODEX_STATE_FILE = Path.home() / '.ccusage-agent-codex-state.json'
 
 
 def parse_config_file() -> Dict[str, str]:
@@ -80,6 +83,10 @@ def get_config() -> Dict[str, Any]:
     insecure_str = get_value('CCUSAGE_INSECURE', 'false').lower()
     insecure = insecure_str in ('true', '1', 'yes')
 
+    # Codex CLI collection toggle
+    codex_disabled_str = get_value('CODEX_DISABLED', 'false').lower()
+    codex_disabled = codex_disabled_str in ('true', '1', 'yes')
+
     return {
         'server': get_value('CCUSAGE_SERVER', 'http://localhost:3000'),
         'api_key': get_value('CCUSAGE_API_KEY', ''),
@@ -87,9 +94,15 @@ def get_config() -> Dict[str, Any]:
             'CLAUDE_PROJECTS_DIR',
             str(Path.home() / '.claude' / 'projects')
         )),
+        'codex_home_dir': Path(get_value(
+            'CODEX_HOME',
+            str(Path.home() / '.codex')
+        )),
+        'codex_disabled': codex_disabled,
         'report_interval': interval,
         'insecure': insecure,
         'state_file': STATE_FILE,
+        'codex_state_file': CODEX_STATE_FILE,
         'config_file': CONFIG_FILE,
     }
 
@@ -175,6 +188,35 @@ def find_jsonl_files(directory: Path) -> List[Path]:
 
     # Sort by earliest timestamp (matching ccusage CLI behavior)
     files.sort(key=_get_earliest_timestamp)
+    return files
+
+
+def find_codex_jsonl_files(codex_home: Path) -> List[Path]:
+    """Recursively find Codex CLI session JSONL files.
+
+    Mirrors the ccusage CLI's Codex adapter (rust/crates/ccusage/src/adapter/codex/paths.rs):
+    scans `sessions/` and `archived_sessions/` under codex_home when either exists,
+    otherwise falls back to scanning codex_home directly (older/nonstandard layouts).
+    Files are sorted by path, matching ccusage's Codex file ordering (unlike Claude's
+    files, which are sorted by earliest timestamp).
+    """
+    if not codex_home.exists():
+        return []
+
+    scan_dirs = [d for d in (codex_home / 'sessions', codex_home / 'archived_sessions') if d.is_dir()]
+    if not scan_dirs:
+        scan_dirs = [codex_home]
+
+    files: List[Path] = []
+    for scan_dir in scan_dirs:
+        try:
+            for item in scan_dir.rglob('*.jsonl'):
+                if item.is_file():
+                    files.append(item)
+        except PermissionError:
+            pass
+
+    files.sort()
     return files
 
 
@@ -289,7 +331,153 @@ def collect_records(files: List[Path], state: 'State') -> List[Dict]:
     return records
 
 
-def _send_batch(batch: List[Dict], url: str, config: Dict, state: State) -> bool:
+_CODEX_USAGE_FIELDS = (
+    ('input_tokens', ('input_tokens', 'prompt_tokens')),
+    ('cached_input_tokens', ('cached_input_tokens', 'cache_read_input_tokens', 'cached_tokens')),
+    ('output_tokens', ('output_tokens', 'completion_tokens')),
+    ('total_tokens', ('total_tokens',)),
+)
+
+
+def _extract_codex_usage(usage: Dict) -> Dict[str, int]:
+    """Normalize a Codex `token_count` usage object to canonical field names.
+
+    Codex CLI versions have used slightly different key names over time
+    (input_tokens vs prompt_tokens, etc); this mirrors the alias handling in
+    ccusage's Rust Codex adapter (adapter/codex/types.rs).
+    """
+    result: Dict[str, int] = {}
+    for canonical, aliases in _CODEX_USAGE_FIELDS:
+        value = 0
+        for alias in aliases:
+            raw = usage.get(alias)
+            if isinstance(raw, (int, float)):
+                value = int(raw)
+                break
+        result[canonical] = value
+    if not result['total_tokens']:
+        result['total_tokens'] = result['input_tokens'] + result['output_tokens']
+    return result
+
+
+def _subtract_codex_usage(current: Dict[str, int], previous: Optional[Dict[str, int]]) -> Dict[str, int]:
+    """Compute the per-event delta between two cumulative Codex usage totals."""
+    prev = previous or {}
+    return {key: max(0, current[key] - prev.get(key, 0)) for key in current}
+
+
+def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]:
+    """Parse Codex CLI session JSONL files and collect usage records.
+
+    Codex session logs interleave `turn_context` entries (which carry the
+    active model name) with `event_msg` entries whose `payload.type ==
+    "token_count"` carries token usage for that turn as either
+    `payload.info.last_token_usage` (a per-turn delta, preferred when present)
+    or `payload.info.total_token_usage` (a running total for the session, in
+    which case the delta is computed against the previous total seen earlier
+    in the same file). This matches ccusage's Rust Codex adapter
+    (adapter/codex/parser.rs::visit_codex_session_entry).
+
+    Codex's `input_tokens` already includes `cached_input_tokens` as a
+    subset (unlike Claude's Messages API, where cache tokens are reported
+    separately from input_tokens) - the billable input_tokens sent to the
+    server therefore has the cached portion subtracted out, with the cached
+    portion reported via cache_read_tokens instead, so the server's
+    input+output+cache_create+cache_read total matches Codex's own total.
+    """
+    records: List[Dict] = []
+
+    for file_path in files:
+        current_model: Optional[str] = None
+        previous_totals: Optional[Dict[str, int]] = None
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_no, line in enumerate(f):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(entry, dict):
+                        continue
+
+                    entry_type = entry.get('type')
+
+                    if entry_type == 'turn_context':
+                        payload = entry.get('payload')
+                        if isinstance(payload, dict):
+                            model = payload.get('model') or payload.get('model_name')
+                            if isinstance(model, str) and model.strip():
+                                current_model = model.strip()
+                        continue
+
+                    if entry_type != 'event_msg':
+                        continue
+
+                    payload = entry.get('payload')
+                    if not isinstance(payload, dict) or payload.get('type') != 'token_count':
+                        continue
+
+                    timestamp_str = entry.get('timestamp')
+                    if not isinstance(timestamp_str, str) or not _ISO_TS_RE.match(timestamp_str):
+                        continue
+
+                    info = payload.get('info')
+                    if not isinstance(info, dict):
+                        continue
+
+                    last_usage = info.get('last_token_usage')
+                    total_usage = info.get('total_token_usage')
+
+                    usage_delta = None
+                    if isinstance(last_usage, dict):
+                        usage_delta = _extract_codex_usage(last_usage)
+                    elif isinstance(total_usage, dict):
+                        current_totals = _extract_codex_usage(total_usage)
+                        usage_delta = _subtract_codex_usage(current_totals, previous_totals)
+
+                    if isinstance(total_usage, dict):
+                        previous_totals = _extract_codex_usage(total_usage)
+
+                    if usage_delta is None:
+                        continue
+
+                    input_tokens = usage_delta['input_tokens']
+                    cached_tokens = min(usage_delta['cached_input_tokens'], input_tokens)
+                    output_tokens = usage_delta['output_tokens']
+
+                    if input_tokens == 0 and output_tokens == 0 and cached_tokens == 0:
+                        continue
+
+                    record_id = f'{file_path}:{line_no}'
+                    if codex_state.is_reported(record_id):
+                        continue
+
+                    model = current_model or 'unknown'
+                    timestamp = _parse_timestamp(timestamp_str)
+                    billable_input = input_tokens - cached_tokens
+
+                    records.append({
+                        'input_tokens': billable_input,
+                        'output_tokens': output_tokens,
+                        'total_tokens': billable_input + output_tokens + cached_tokens,
+                        'cache_create_tokens': 0,
+                        'cache_read_tokens': cached_tokens,
+                        'session_id': file_path.stem,
+                        'model': f'codex/{model}',
+                        'timestamp': timestamp,
+                        '_record_id': record_id,
+                    })
+        except Exception as e:
+            print(f'Error reading {file_path}: {e}', file=sys.stderr)
+
+    return records
+
+
+def _send_batch(batch: List[Dict], url: str, config: Dict) -> bool:
     """Send a single batch of records to the server."""
     payload = {
         'records': [
@@ -333,10 +521,9 @@ def _send_batch(batch: List[Dict], url: str, config: Dict, state: State) -> bool
             skipped = result.get('skipped', 0)
             print(f"  ✓ Batch OK: {inserted} inserted, {skipped} skipped")
 
-            # Mark records as reported
+            # Mark records as reported, on whichever state store each originated from
             for r in batch:
-                state.mark_reported(r['_record_id'])
-            state.save()
+                r['_state'].mark_reported(r['_record_id'])
             return True
 
     except HTTPError as e:
@@ -354,8 +541,8 @@ def _send_batch(batch: List[Dict], url: str, config: Dict, state: State) -> bool
 BATCH_SIZE = 500
 
 
-def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
-    """Report usage records to the server in batches."""
+def report_usage(records: List[Dict], config: Dict, state: State, codex_state: State) -> bool:
+    """Report usage records (Claude Code + Codex CLI) to the server in batches."""
     if not records:
         print('No new records to report')
         return True
@@ -371,10 +558,12 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
         batch_num = i // BATCH_SIZE + 1
         total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
         print(f'Reporting batch {batch_num}/{total_batches} ({len(batch)} records)...')
-        if not _send_batch(batch, url, config, state):
+        if not _send_batch(batch, url, config):
             all_ok = False
             print(f'  Stopping due to error (remaining records will be retried next run)')
             break
+        state.save()
+        codex_state.save()
 
     if all_ok:
         print(f'✓ All {total} records reported successfully')
@@ -382,25 +571,36 @@ def report_usage(records: List[Dict], config: Dict, state: State) -> bool:
     return all_ok
 
 
-def collect_and_report(config: Dict, state: State) -> bool:
-    """Collect usage data and report to server. Returns True on success."""
+def collect_and_report(config: Dict, state: State, codex_state: State) -> bool:
+    """Collect usage data from all sources and report to server. Returns True on success."""
     print(f'[{time.strftime("%H:%M:%S")}] Collecting usage data...')
 
     files = find_jsonl_files(config['claude_projects_dir'])
-    print(f'Found {len(files)} JSONL files')
+    print(f'Found {len(files)} Claude Code JSONL files')
+    claude_records = collect_records(files, state)
+    print(f'Collected {len(claude_records)} new Claude Code records')
+    for r in claude_records:
+        r['_state'] = state
 
-    all_records = collect_records(files, state)
-    print(f'Collected {len(all_records)} new records')
+    codex_records: List[Dict] = []
+    if not config['codex_disabled']:
+        codex_files = find_codex_jsonl_files(config['codex_home_dir'])
+        print(f'Found {len(codex_files)} Codex CLI JSONL files')
+        codex_records = collect_codex_records(codex_files, codex_state)
+        print(f'Collected {len(codex_records)} new Codex CLI records')
+        for r in codex_records:
+            r['_state'] = codex_state
 
-    success = report_usage(all_records, config, state)
+    all_records = claude_records + codex_records
+    success = report_usage(all_records, config, state, codex_state)
 
     print('---')
     return success
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description='CCUsage Agent - Claude Code Usage Monitor',
+        description='CCUsage Agent - Claude Code & Codex CLI Usage Monitor',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Configuration File:
@@ -413,6 +613,8 @@ Environment Variables:
   CCUSAGE_SERVER        Server URL
   CCUSAGE_API_KEY       API key for authentication
   CLAUDE_PROJECTS_DIR   Claude projects directory
+  CODEX_HOME            Codex CLI home directory (default: ~/.codex)
+  CODEX_DISABLED        Disable Codex CLI usage collection (true/false)
   REPORT_INTERVAL       Report interval in minutes (1-1440)
   CCUSAGE_INSECURE      Skip SSL certificate verification (true/false)
 
@@ -425,6 +627,9 @@ Examples:
 
   # Run with self-signed certificate (skip SSL verification)
   python3 agent.py --server https://my-server.com --api-key KEY --insecure
+
+  # Point at a non-default Codex home and disable Codex collection
+  python3 agent.py --codex-home /home/user/.codex --no-codex
         '''
     )
     parser.add_argument('--server', help='Server URL (default: http://localhost:3000)')
@@ -433,7 +638,13 @@ Examples:
     parser.add_argument('--once', action='store_true', help='Run once and exit')
     parser.add_argument('--insecure', '-k', action='store_true',
                         help='Skip SSL certificate verification (for self-signed certs)')
+    parser.add_argument('--codex-home', help='Codex CLI home directory (default: ~/.codex or $CODEX_HOME)')
+    parser.add_argument('--no-codex', action='store_true', help='Disable Codex CLI usage collection')
+    return parser
 
+
+def main():
+    parser = build_parser()
     args = parser.parse_args()
 
     # Get configuration
@@ -449,6 +660,10 @@ Examples:
             config['report_interval'] = args.interval
     if args.insecure:
         config['insecure'] = True
+    if args.codex_home:
+        config['codex_home_dir'] = Path(args.codex_home)
+    if args.no_codex:
+        config['codex_disabled'] = True
 
     # Validate API key
     if not config['api_key']:
@@ -456,11 +671,16 @@ Examples:
         sys.exit(1)
 
     state = State(config['state_file'])
+    codex_state = State(config['codex_state_file'])
 
     if not args.once:
         print(f'CCUsage Agent v{VERSION} started')
         print(f"Server: {config['server']}")
         print(f"Claude projects: {config['claude_projects_dir']}")
+        if config['codex_disabled']:
+            print('Codex CLI collection: disabled')
+        else:
+            print(f"Codex home: {config['codex_home_dir']}")
         print(f"Report interval: {config['report_interval']} minute(s)")
         if config.get('insecure'):
             print('WARNING: SSL certificate verification is disabled')
@@ -472,23 +692,25 @@ Examples:
     def signal_handler(signum, frame):
         print('\nShutting down...')
         state.save()
+        codex_state.save()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Initial collection
-    success = collect_and_report(config, state)
+    success = collect_and_report(config, state, codex_state)
 
     if args.once:
         state.save()
+        codex_state.save()
         sys.exit(0 if success else 1)
 
     # Periodic collection
     interval_seconds = config['report_interval'] * 60
     while True:
         time.sleep(interval_seconds)
-        collect_and_report(config, state)
+        collect_and_report(config, state, codex_state)
 
 
 if __name__ == '__main__':

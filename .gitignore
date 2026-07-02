@@ -40,3 +40,8 @@ next-env.d.ts
 
 # data directory
 /data
+
+# python (agent tests)
+__pycache__/
+*.pyc
+.pytest_cache/
