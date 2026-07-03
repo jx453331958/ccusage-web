@@ -126,17 +126,23 @@ def _write_session(path: Path, lines):
     path.write_text('\n'.join(json.dumps(line) for line in lines) + '\n')
 
 
-def _token_count_event(ts, last=None, total=None):
+def _token_count_event(ts, last=None, total=None, session_id=None):
     info = {}
     if last is not None:
         info['last_token_usage'] = last
     if total is not None:
         info['total_token_usage'] = total
-    return {'timestamp': ts, 'type': 'event_msg', 'payload': {'type': 'token_count', 'info': info}}
+    entry = {'timestamp': ts, 'type': 'event_msg', 'payload': {'type': 'token_count', 'info': info}}
+    if session_id is not None:
+        entry['session_id'] = session_id
+    return entry
 
 
-def _turn_context(model, ts='2026-06-22T02:25:53.138Z'):
-    return {'timestamp': ts, 'type': 'turn_context', 'payload': {'model': model}}
+def _turn_context(model, ts='2026-06-22T02:25:53.138Z', session_id=None):
+    entry = {'timestamp': ts, 'type': 'turn_context', 'payload': {'model': model}}
+    if session_id is not None:
+        entry['session_id'] = session_id
+    return entry
 
 
 class _FakeState:
@@ -155,28 +161,38 @@ class _FakeState:
         pass
 
 
-def test_collect_codex_records_uses_last_token_usage_delta(tmp_path):
+def test_collect_codex_records_uses_total_usage_delta_when_last_usage_present(tmp_path):
     session = tmp_path / 'session.jsonl'
     _write_session(session, [
         _turn_context('gpt-5.5'),
         _token_count_event(
-            '2026-06-22T02:25:58.420Z',
+            '2026-06-22T02:25:58.000Z',
             last={'input_tokens': 11782, 'cached_input_tokens': 2432, 'output_tokens': 221, 'total_tokens': 12003},
             total={'input_tokens': 11782, 'cached_input_tokens': 2432, 'output_tokens': 221, 'total_tokens': 12003},
+        ),
+        _token_count_event(
+            '2026-06-22T02:26:04.000Z',
+            # Codex logs can include this field, but ccusage computes the turn
+            # from cumulative total_token_usage instead.
+            last={'input_tokens': 999999, 'cached_input_tokens': 999999, 'output_tokens': 999999, 'total_tokens': 999999},
+            total={'input_tokens': 13000, 'cached_input_tokens': 2500, 'output_tokens': 300, 'total_tokens': 13300},
         ),
     ])
 
     records = agent.collect_codex_records([session], _FakeState())
 
-    assert len(records) == 1
-    r = records[0]
-    assert r['model'] == 'codex/gpt-5.5'
-    assert r['cache_read_tokens'] == 2432
-    assert r['cache_create_tokens'] == 0
-    assert r['input_tokens'] == 11782 - 2432
-    assert r['output_tokens'] == 221
-    assert r['total_tokens'] == 11782 + 221
-    assert r['session_id'] == 'session'
+    assert len(records) == 2
+    first, second = records
+    assert first['model'] == 'codex/gpt-5.5'
+    assert first['cache_read_tokens'] == 2432
+    assert first['cache_create_tokens'] == 0
+    assert first['input_tokens'] == 11782 - 2432
+    assert first['output_tokens'] == 221
+    assert first['total_tokens'] == 11782 + 221
+    assert first['session_id'] == 'session'
+    assert second['cache_read_tokens'] == 68
+    assert second['input_tokens'] == (13000 - 11782) - 68
+    assert second['output_tokens'] == 79
 
 
 def test_collect_codex_records_falls_back_to_total_usage_delta(tmp_path):
@@ -206,7 +222,7 @@ def test_collect_codex_records_skips_zero_usage_events(tmp_path):
     _write_session(session, [
         _turn_context('gpt-5.5'),
         _token_count_event('2026-06-22T02:25:58.000Z',
-                            last={'input_tokens': 0, 'output_tokens': 0, 'cached_input_tokens': 0, 'total_tokens': 0}),
+                            total={'input_tokens': 0, 'output_tokens': 0, 'cached_input_tokens': 0, 'total_tokens': 0}),
     ])
 
     records = agent.collect_codex_records([session], _FakeState())
@@ -218,7 +234,7 @@ def test_collect_codex_records_defaults_model_when_missing(tmp_path):
     session = tmp_path / 'session.jsonl'
     _write_session(session, [
         _token_count_event('2026-06-22T02:25:58.000Z',
-                            last={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15}),
+                            total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15}),
     ])
 
     records = agent.collect_codex_records([session], _FakeState())
@@ -253,7 +269,7 @@ def test_collect_codex_records_dedups_via_state(tmp_path):
     _write_session(session, [
         _turn_context('gpt-5.5'),
         _token_count_event('2026-06-22T02:25:58.000Z',
-                            last={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15}),
+                            total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15}),
     ])
     state = _FakeState()
 
@@ -263,6 +279,33 @@ def test_collect_codex_records_dedups_via_state(tmp_path):
         state.mark_reported(r['_record_id'])
 
     second_pass = agent.collect_codex_records([session], state)
+    assert second_pass == []
+
+
+def test_collect_codex_records_dedup_key_survives_session_file_move(tmp_path):
+    sessions = tmp_path / 'sessions'
+    archived = tmp_path / 'archived_sessions'
+    sessions.mkdir()
+    archived.mkdir()
+    active_session = sessions / 'session.jsonl'
+    archived_session = archived / 'session.jsonl'
+    entries = [
+        _turn_context('gpt-5.5', session_id='codex-session-1'),
+        _token_count_event('2026-06-22T02:25:58.000Z',
+                            total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15},
+                            session_id='codex-session-1'),
+    ]
+    _write_session(active_session, entries)
+    _write_session(archived_session, entries)
+    state = _FakeState()
+
+    first_pass = agent.collect_codex_records([active_session], state)
+    assert len(first_pass) == 1
+    assert first_pass[0]['session_id'] == 'codex-session-1'
+    for r in first_pass:
+        state.mark_reported(r['_record_id'])
+
+    second_pass = agent.collect_codex_records([archived_session], state)
     assert second_pass == []
 
 
@@ -350,7 +393,7 @@ def test_collect_and_report_skips_codex_when_disabled(tmp_path):
     (config['codex_home_dir'] / 'sessions').mkdir()
     (config['codex_home_dir'] / 'sessions' / 'session.jsonl').write_text(
         json.dumps(_token_count_event('2026-06-22T02:25:58.000Z',
-                                       last={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15})) + '\n'
+                                       total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15})) + '\n'
     )
     claude_state = agent.State(tmp_path / 'claude.json')
     codex_state = agent.State(tmp_path / 'codex.json')
@@ -375,7 +418,7 @@ def test_collect_and_report_includes_codex_records_when_enabled(tmp_path):
     (sessions / 'session.jsonl').write_text(
         json.dumps(_turn_context('gpt-5.5')) + '\n' +
         json.dumps(_token_count_event('2026-06-22T02:25:58.000Z',
-                                       last={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15})) + '\n'
+                                       total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15})) + '\n'
     )
     claude_state = agent.State(tmp_path / 'claude.json')
     codex_state = agent.State(tmp_path / 'codex.json')

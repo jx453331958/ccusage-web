@@ -262,3 +262,5 @@ To clear the state and re-report all usage data (e.g., after a server database r
 ```bash
 ./setup.sh reset
 ```
+
+This removes both local dedup files: `~/.ccusage-agent-state.json` for Claude Code and `~/.ccusage-agent-codex-state.json` for Codex CLI.

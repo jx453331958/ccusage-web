@@ -520,6 +520,7 @@ cmd_uninstall() {
     uninstall_cron
     rm -f "$CONFIG_FILE"
     rm -f "$HOME/.ccusage-agent-state.json"
+    rm -f "$HOME/.ccusage-agent-codex-state.json"
     rm -rf "$INSTALL_DIR"
 
     log_info "Uninstall complete"
@@ -618,8 +619,9 @@ cmd_update() {
 }
 
 cmd_reset() {
-    log_warn "This will clear the local state file so the agent re-reports ALL usage data."
-    log_warn "State file: $HOME/.ccusage-agent-state.json"
+    log_warn "This will clear the local state files so the agent re-reports ALL usage data."
+    log_warn "Claude state file: $HOME/.ccusage-agent-state.json"
+    log_warn "Codex state file: $HOME/.ccusage-agent-codex-state.json"
 
     # Check if running interactively
     local can_prompt=false
@@ -642,11 +644,20 @@ cmd_reset() {
         fi
     fi
 
+    local deleted=false
     if [[ -f "$HOME/.ccusage-agent-state.json" ]]; then
         rm -f "$HOME/.ccusage-agent-state.json"
-        log_info "State file deleted. The agent will re-report all usage data on next run."
+        deleted=true
+    fi
+    if [[ -f "$HOME/.ccusage-agent-codex-state.json" ]]; then
+        rm -f "$HOME/.ccusage-agent-codex-state.json"
+        deleted=true
+    fi
+
+    if [[ "$deleted" == "true" ]]; then
+        log_info "State files deleted. The agent will re-report all usage data on next run."
     else
-        log_warn "State file not found. Nothing to reset."
+        log_warn "State files not found. Nothing to reset."
     fi
 
     # Restart service if running

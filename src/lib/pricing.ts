@@ -31,29 +31,6 @@ const FALLBACK_PRICING: Record<string, { input: number; output: number; inputAbo
   'claude-3-haiku': { input: 0.25 / 1e6, output: 1.25 / 1e6, cacheWrite: 1.50 / 1e6, cacheRead: 0.10 / 1e6 },
 };
 
-// Approximate OpenAI/Codex pricing (USD per token), used for `codex/`-tagged
-// records. LiteLLM's fetched pricing table is filtered to Anthropic/Claude
-// models only (see fetchPricing below), so Codex records never match it and
-// always land here.
-const CODEX_FALLBACK_PRICING: Record<string, { input: number; output: number; cacheRead?: number }> = {
-  'gpt-5.5': { input: 1.75 / 1e6, output: 14 / 1e6, cacheRead: 0.175 / 1e6 },
-  'gpt-5-mini': { input: 0.25 / 1e6, output: 2 / 1e6, cacheRead: 0.025 / 1e6 },
-  'gpt-5': { input: 1.25 / 1e6, output: 10 / 1e6, cacheRead: 0.125 / 1e6 },
-  'gpt-4o': { input: 2.5 / 1e6, output: 10 / 1e6, cacheRead: 1.25 / 1e6 },
-};
-
-const CODEX_DEFAULT_PRICING = { input: 1.25 / 1e6, output: 10 / 1e6, cacheRead: 0.125 / 1e6 };
-
-function findCodexFallback(model: string): { input: number; output: number; cacheRead?: number } {
-  const bareModel = model.replace(/^codex\//, '');
-  for (const [key, value] of Object.entries(CODEX_FALLBACK_PRICING)) {
-    if (bareModel.startsWith(key) || bareModel.includes(key)) {
-      return value;
-    }
-  }
-  return CODEX_DEFAULT_PRICING;
-}
-
 export async function fetchPricing(): Promise<PricingData> {
   const now = Date.now();
   if (cachedPricing && now - cacheTimestamp < CACHE_TTL) {
@@ -151,12 +128,6 @@ export function calculateCostWithPricing(
   cacheCreateTokens: number = 0,
   cacheReadTokens: number = 0,
 ): number {
-  if (model.startsWith('codex/')) {
-    const codexPricing = findCodexFallback(model);
-    const cacheReadCost = cacheReadTokens * (codexPricing.cacheRead ?? codexPricing.input);
-    return inputTokens * codexPricing.input + outputTokens * codexPricing.output + cacheReadCost;
-  }
-
   const entry = findPricing(pricing, model);
 
   if (entry && entry.input_cost_per_token != null && entry.output_cost_per_token != null) {

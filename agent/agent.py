@@ -26,6 +26,7 @@ import time
 import signal
 import argparse
 import ssl
+import hashlib
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -366,16 +367,37 @@ def _subtract_codex_usage(current: Dict[str, int], previous: Optional[Dict[str, 
     return {key: max(0, current[key] - prev.get(key, 0)) for key in current}
 
 
+def _codex_session_key(entry: Dict[str, Any]) -> Optional[str]:
+    """Return the most stable available Codex session identifier."""
+    payload = entry.get('payload')
+    info = payload.get('info') if isinstance(payload, dict) else None
+    for container in (entry, payload, info):
+        if not isinstance(container, dict):
+            continue
+        for key in ('session_id', 'sessionId', 'conversation_id', 'conversationId'):
+            value = container.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _codex_record_id(session_key: str, token_event_index: int, timestamp: str, totals: Dict[str, int]) -> str:
+    """Build a relocation-stable id from Codex session content, not the file path."""
+    fingerprint = hashlib.sha256(
+        json.dumps(totals, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    ).hexdigest()[:16]
+    return f'codex:{session_key}:{token_event_index}:{timestamp}:{fingerprint}'
+
+
 def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]:
     """Parse Codex CLI session JSONL files and collect usage records.
 
     Codex session logs interleave `turn_context` entries (which carry the
     active model name) with `event_msg` entries whose `payload.type ==
-    "token_count"` carries token usage for that turn as either
-    `payload.info.last_token_usage` (a per-turn delta, preferred when present)
-    or `payload.info.total_token_usage` (a running total for the session, in
-    which case the delta is computed against the previous total seen earlier
-    in the same file). This matches ccusage's Rust Codex adapter
+    "token_count"` carries cumulative token usage in
+    `payload.info.total_token_usage`. Per-turn usage is computed by subtracting
+    the previous cumulative total seen earlier in the same session. This
+    matches ccusage's Rust Codex adapter
     (adapter/codex/parser.rs::visit_codex_session_entry).
 
     Codex's `input_tokens` already includes `cached_input_tokens` as a
@@ -386,14 +408,17 @@ def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]
     input+output+cache_create+cache_read total matches Codex's own total.
     """
     records: List[Dict] = []
+    processed_record_ids: Set[str] = set()
 
     for file_path in files:
         current_model: Optional[str] = None
         previous_totals: Optional[Dict[str, int]] = None
+        session_key = file_path.stem
+        token_event_index = 0
 
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                for line_no, line in enumerate(f):
+                for line in f:
                     line = line.strip()
                     if not line:
                         continue
@@ -404,6 +429,9 @@ def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]
                     if not isinstance(entry, dict):
                         continue
 
+                    extracted_session_key = _codex_session_key(entry)
+                    if extracted_session_key:
+                        session_key = extracted_session_key
                     entry_type = entry.get('type')
 
                     if entry_type == 'turn_context':
@@ -429,21 +457,14 @@ def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]
                     if not isinstance(info, dict):
                         continue
 
-                    last_usage = info.get('last_token_usage')
                     total_usage = info.get('total_token_usage')
-
-                    usage_delta = None
-                    if isinstance(last_usage, dict):
-                        usage_delta = _extract_codex_usage(last_usage)
-                    elif isinstance(total_usage, dict):
-                        current_totals = _extract_codex_usage(total_usage)
-                        usage_delta = _subtract_codex_usage(current_totals, previous_totals)
-
-                    if isinstance(total_usage, dict):
-                        previous_totals = _extract_codex_usage(total_usage)
-
-                    if usage_delta is None:
+                    if not isinstance(total_usage, dict):
                         continue
+
+                    token_event_index += 1
+                    current_totals = _extract_codex_usage(total_usage)
+                    usage_delta = _subtract_codex_usage(current_totals, previous_totals)
+                    previous_totals = current_totals
 
                     input_tokens = usage_delta['input_tokens']
                     cached_tokens = min(usage_delta['cached_input_tokens'], input_tokens)
@@ -452,9 +473,10 @@ def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]
                     if input_tokens == 0 and output_tokens == 0 and cached_tokens == 0:
                         continue
 
-                    record_id = f'{file_path}:{line_no}'
-                    if codex_state.is_reported(record_id):
+                    record_id = _codex_record_id(session_key, token_event_index, timestamp_str, current_totals)
+                    if record_id in processed_record_ids or codex_state.is_reported(record_id):
                         continue
+                    processed_record_ids.add(record_id)
 
                     model = current_model or 'unknown'
                     timestamp = _parse_timestamp(timestamp_str)
@@ -466,7 +488,7 @@ def collect_codex_records(files: List[Path], codex_state: 'State') -> List[Dict]
                         'total_tokens': billable_input + output_tokens + cached_tokens,
                         'cache_create_tokens': 0,
                         'cache_read_tokens': cached_tokens,
-                        'session_id': file_path.stem,
+                        'session_id': session_key,
                         'model': f'codex/{model}',
                         'timestamp': timestamp,
                         '_record_id': record_id,
