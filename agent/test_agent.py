@@ -123,7 +123,23 @@ def test_find_codex_jsonl_files_sorted_by_path(tmp_path):
 # ---------------------------------------------------------------------------
 
 def _write_session(path: Path, lines):
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('\n'.join(json.dumps(line) for line in lines) + '\n')
+
+
+def _session_meta(session_id='019eed22-7b2c-70d3-86ac-26df1ba4bdd2'):
+    return {
+        'timestamp': '2026-06-22T02:22:00.492Z',
+        'type': 'session_meta',
+        'payload': {
+            'id': session_id,
+            'timestamp': '2026-06-22T02:22:00.492Z',
+            'cwd': '/home/omidk/code',
+            'originator': 'codex-tui',
+            'cli_version': '0.141.0',
+            'source': 'cli',
+        },
+    }
 
 
 def _token_count_event(ts, last=None, total=None, session_id=None):
@@ -287,13 +303,13 @@ def test_collect_codex_records_dedup_key_survives_session_file_move(tmp_path):
     archived = tmp_path / 'archived_sessions'
     sessions.mkdir()
     archived.mkdir()
-    active_session = sessions / 'session.jsonl'
-    archived_session = archived / 'session.jsonl'
+    active_session = sessions / 'rollout-2026-06-21T22-22-00-019eed22-7b2c-70d3-86ac-26df1ba4bdd2.jsonl'
+    archived_session = archived / 'renamed-after-archive.jsonl'
     entries = [
-        _turn_context('gpt-5.5', session_id='codex-session-1'),
+        _session_meta('019eed22-7b2c-70d3-86ac-26df1ba4bdd2'),
+        _turn_context('gpt-5.5'),
         _token_count_event('2026-06-22T02:25:58.000Z',
-                            total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15},
-                            session_id='codex-session-1'),
+                            total={'input_tokens': 10, 'output_tokens': 5, 'cached_input_tokens': 0, 'total_tokens': 15}),
     ]
     _write_session(active_session, entries)
     _write_session(archived_session, entries)
@@ -301,12 +317,38 @@ def test_collect_codex_records_dedup_key_survives_session_file_move(tmp_path):
 
     first_pass = agent.collect_codex_records([active_session], state)
     assert len(first_pass) == 1
-    assert first_pass[0]['session_id'] == 'codex-session-1'
+    assert first_pass[0]['session_id'] == '019eed22-7b2c-70d3-86ac-26df1ba4bdd2'
+    assert 'rollout-2026-06-21T22-22-00' not in first_pass[0]['_record_id']
     for r in first_pass:
         state.mark_reported(r['_record_id'])
 
     second_pass = agent.collect_codex_records([archived_session], state)
     assert second_pass == []
+
+
+def test_collect_codex_records_uses_real_session_meta_payload_id_instead_of_file_stem(tmp_path):
+    session = tmp_path / 'rollout-2026-06-21T22-22-00-019eed22-7b2c-70d3-86ac-26df1ba4bdd2.jsonl'
+    _write_session(session, [
+        _session_meta('019eed22-7b2c-70d3-86ac-26df1ba4bdd2'),
+        {
+            'timestamp': '2026-06-22T02:22:02.000Z',
+            'type': 'event_msg',
+            'payload': {'type': 'task_started'},
+        },
+        _turn_context('gpt-5.5'),
+        _token_count_event(
+            '2026-06-22T02:25:58.420Z',
+            last={'input_tokens': 999999, 'cached_input_tokens': 999999, 'output_tokens': 999999, 'total_tokens': 999999},
+            total={'input_tokens': 11782, 'cached_input_tokens': 2432, 'output_tokens': 221, 'total_tokens': 12003},
+        ),
+    ])
+
+    records = agent.collect_codex_records([session], _FakeState())
+
+    assert len(records) == 1
+    assert records[0]['session_id'] == '019eed22-7b2c-70d3-86ac-26df1ba4bdd2'
+    assert records[0]['session_id'] != session.stem
+    assert records[0]['_record_id'].startswith('codex:019eed22-7b2c-70d3-86ac-26df1ba4bdd2:')
 
 
 # ---------------------------------------------------------------------------

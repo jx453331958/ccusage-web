@@ -370,6 +370,11 @@ def _subtract_codex_usage(current: Dict[str, int], previous: Optional[Dict[str, 
 def _codex_session_key(entry: Dict[str, Any]) -> Optional[str]:
     """Return the most stable available Codex session identifier."""
     payload = entry.get('payload')
+    if entry.get('type') == 'session_meta' and isinstance(payload, dict):
+        value = payload.get('id')
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
     info = payload.get('info') if isinstance(payload, dict) else None
     for container in (entry, payload, info):
         if not isinstance(container, dict):
